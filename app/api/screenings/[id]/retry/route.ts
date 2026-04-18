@@ -8,11 +8,11 @@ import { ScreeningModel } from "@/models/Screening";
 import { executeScreening } from "@/src/services/geminiScreeningService";
 import { toApplicantsForScreening, toJobForScreening } from "@/src/services/screeningService";
 
-export async function POST(_request: Request, context: { params: { id: string } }) {
+export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireSession();
   if (auth.response || !auth.session) return auth.response;
 
-  const { id } = context.params;
+  const { id } = await context.params;
   if (!Types.ObjectId.isValid(id)) {
     return NextResponse.json({ success: false, error: "Invalid screening id." }, { status: 400 });
   }

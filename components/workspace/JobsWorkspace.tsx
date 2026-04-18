@@ -65,6 +65,7 @@ type ScreeningDetailRecord = {
   processingTimeMs?: number;
   aiModelVersion?: string;
   promptVersion?: string;
+  usedFallback?: boolean;
   errorMessage?: string;
   createdAt: string;
 };
@@ -847,7 +848,6 @@ export default function JobsWorkspace({
         processingTimeMs: detail.processingTimeMs,
         aiModelVersion: detail.aiModelVersion,
         promptVersion: detail.promptVersion,
-        usedFallback: detail.usedFallback,
         errorMessage: detail.errorMessage,
       };
 
