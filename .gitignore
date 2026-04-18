@@ -22,7 +22,17 @@
 
 # misc
 .DS_Store
+Thumbs.db
 *.pem
+.eslintcache
+
+# editors and tooling
+.idea/
+.vscode/
+*.code-workspace
+
+# next.js build caches
+/.turbo
 
 # debug
 npm-debug.log*
@@ -35,6 +45,9 @@ yarn-error.log*
 
 # vercel
 .vercel
+/.vercel/output
+/.vercel/cache
+/.vercel/project.json
 
 # typescript
 *.tsbuildinfo

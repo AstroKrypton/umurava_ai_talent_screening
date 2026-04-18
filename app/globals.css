@@ -1,26 +1,274 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
+/* ── Theme Variables ── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: #F5F5F7;
+  --color-foreground: #1C1C2E;
+  --color-ios-blue: #007AFF;
+  --color-ios-green: #34C759;
+  --color-ios-red: #FF3B30;
+  --color-rwanda-sky: #0B4F8A;
+  --color-rwanda-sky-tint: #E8F3FC;
+  --color-rwanda-hills: #1A8C4E;
+  --color-rwanda-hills-tint: #E6F6EE;
+  --color-rwanda-gold: #F5C518;
+  --color-rwanda-gold-tint: #FEF8E1;
+  --color-rwanda-gold-text: #7A5C00;
+  --color-rwanda-imigongo: #C8401E;
+  --color-rwanda-imigongo-tint: #FAF0ED;
+  --color-rwanda-night: #1C1C2E;
+  --color-glass-bg: rgba(255, 255, 255, 0.6);
+  --color-glass-border: rgba(255, 255, 255, 0.8);
+  --color-glass-shadow: rgba(0, 0, 0, 0.06);
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+  
+  /* Animation durations */
+  --duration-slow: 4s;
+  --duration-medium: 2s;
+  --duration-fast: 0.8s;
+  --duration-shimmer: 3s;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── Base Reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  overflow-x: hidden;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Horizontal Scroll Pipeline ── */
+.pipeline-container {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.pipeline-track {
+  display: flex;
+  width: 300%;
+  height: 100%;
+  will-change: transform;
+}
+
+.pipeline-panel {
+  width: 33.333%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  position: relative;
+}
+
+/* ── Liquid Glass Card ── */
+.glass-card {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid var(--color-glass-border);
+  box-shadow: 0 8px 30px var(--color-glass-shadow);
+  border-radius: 2rem;
+}
+
+/* ── Animation Keyframes ── */
+@keyframes pulse-dot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.6);
+    opacity: 0.2;
+  }
+}
+
+@keyframes draw-ring {
+  from {
+    stroke-dashoffset: 565;
+  }
+  to {
+    stroke-dashoffset: 11.3;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes draw-line {
+  from {
+    stroke-dashoffset: 2000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ── Animation Classes ── */
+
+/* Pulsing Dot */
+.pulse-dot {
+  animation: pulse-dot var(--duration-medium) ease-in-out infinite;
+}
+
+.pulse-dot-delay-1 { animation-delay: 0.4s; }
+.pulse-dot-delay-2 { animation-delay: 0.8s; }
+.pulse-dot-delay-3 { animation-delay: 1.2s; }
+
+/* Progress Ring */
+.progress-ring-circle {
+  animation: draw-ring var(--duration-medium) ease-out forwards;
+  animation-play-state: paused;
+}
+
+.progress-ring-circle.animate {
+  animation-play-state: running;
+}
+
+/* Fade In Up */
+.fade-in-up {
+  animation: fade-in-up var(--duration-fast) ease-out forwards;
+}
+
+.fade-in-up-delay-1 {
+  animation-delay: 0.15s;
+  opacity: 0;
+}
+
+.fade-in-up-delay-2 {
+  animation-delay: 0.3s;
+  opacity: 0;
+}
+
+.fade-in-up-delay-3 {
+  animation-delay: 0.45s;
+  opacity: 0;
+}
+
+.fade-in-up-delay-4 {
+  animation-delay: 0.6s;
+  opacity: 0;
+}
+
+/* Shimmer Effect */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0) 0%,
+    rgba(255,255,255,0.4) 50%,
+    rgba(255,255,255,0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--duration-shimmer) ease-in-out infinite;
+}
+
+/* Floating Animation */
+.float {
+  animation: float var(--duration-slow) ease-in-out infinite;
+}
+
+.float-delay-1 { animation-delay: 0.5s; }
+.float-delay-2 { animation-delay: 1s; }
+
+/* SVG Connecting Line */
+.connecting-line {
+  stroke-dasharray: 2000;
+  animation: draw-line var(--duration-slow) ease-in-out forwards;
+}
+
+/* ── Component Styles ── */
+
+/* iOS Pill Tag */
+.pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.pill-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* ── Scrollbar Styling ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
+}
+
+/* ── Utility Classes ── */
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .pipeline-panel {
+    padding: 1rem;
+  }
+  
+  .glass-card {
+    border-radius: 1.5rem;
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
