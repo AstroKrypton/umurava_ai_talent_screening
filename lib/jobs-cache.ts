@@ -5,5 +5,5 @@ export const JOBS_LISTING_TAG = "jobs:list";
 
 export function revalidateJobsListing() {
   revalidatePath(JOBS_LISTING_PATH);
-  revalidateTag(JOBS_LISTING_TAG);
+  revalidateTag(JOBS_LISTING_TAG, "max");
 }
