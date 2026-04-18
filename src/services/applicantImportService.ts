@@ -92,6 +92,176 @@ function parseJson<T>(value: unknown): T | undefined {
   }
 }
 
+const AVAILABILITY_STATUS_MAP: Record<string, Availability["status"]> = {
+  available: "Available",
+  "open to opportunities": "Open to Opportunities",
+  "not available": "Not Available",
+};
+
+const AVAILABILITY_TYPE_MAP: Record<string, Availability["type"]> = {
+  "full-time": "Full-time",
+  "part-time": "Part-time",
+  contract: "Contract",
+};
+
+const LANGUAGE_PROFICIENCY_MAP: Record<string, Language["proficiency"]> = {
+  basic: "Basic",
+  conversational: "Conversational",
+  fluent: "Fluent",
+  native: "Native",
+};
+
+function normaliseSkillLevel(level?: string): Skill["level"] {
+  if (!level) return "Intermediate";
+  const normalised = level.trim().toLowerCase();
+  switch (normalised) {
+    case "beginner":
+      return "Beginner";
+    case "intermediate":
+      return "Intermediate";
+    case "advanced":
+      return "Advanced";
+    case "expert":
+      return "Expert";
+    default:
+      return "Intermediate";
+  }
+}
+
+function toNumber(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function toBoolean(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalised = value.trim().toLowerCase();
+  return ["true", "1", "yes", "y", "current"].includes(normalised);
+}
+
+function normaliseAvailabilityStatus(status?: string): Availability["status"] {
+  if (!status) return "Open to Opportunities";
+  const key = status.trim().toLowerCase();
+  return AVAILABILITY_STATUS_MAP[key] ?? "Open to Opportunities";
+}
+
+function normaliseAvailabilityType(type?: string): Availability["type"] {
+  if (!type) return "Full-time";
+  const key = type.trim().toLowerCase();
+  return AVAILABILITY_TYPE_MAP[key] ?? "Full-time";
+}
+
+function normaliseLanguageProficiency(value?: string): Language["proficiency"] {
+  if (!value) return "Conversational";
+  const key = value.trim().toLowerCase();
+  return LANGUAGE_PROFICIENCY_MAP[key] ?? "Conversational";
+}
+
+function parseDelimitedSkills(raw: string): Skill[] {
+  return raw
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [name, level, years] = entry.split(":");
+      return {
+        name: (name ?? "").trim(),
+        level: normaliseSkillLevel(level),
+        yearsOfExperience: toNumber(years)?.valueOf() ?? 0,
+      } satisfies Skill;
+    })
+    .filter((item) => item.name.length > 0);
+}
+
+function parseDelimitedExperience(raw: string): Experience[] {
+  return raw
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const parts = entry.split(":");
+      const [companyRaw, roleRaw, startDateRaw, endDateRaw, ...rest] = parts;
+      const technologiesRaw = rest.length >= 2 ? rest[rest.length - 2] : "";
+      const isCurrentRaw = rest.length >= 1 ? rest[rest.length - 1] : "";
+      const descriptionRaw = rest.slice(0, Math.max(0, rest.length - 2)).join(":");
+
+      const technologies = technologiesRaw
+        .split(",")
+        .map((tech) => tech.trim())
+        .filter(Boolean);
+
+      return {
+        company: (companyRaw ?? "").trim(),
+        role: (roleRaw ?? "").trim(),
+        startDate: (startDateRaw ?? "").trim(),
+        endDate: (endDateRaw ?? "").trim(),
+        description: descriptionRaw.trim(),
+        technologies,
+        isCurrent: toBoolean(isCurrentRaw) || (endDateRaw ?? "").trim().toLowerCase() === "present",
+      } satisfies Experience;
+    })
+    .filter((item) => item.company.length > 0 && item.role.length > 0);
+}
+
+function parseDelimitedEducation(raw: string): Education[] {
+  return raw
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const parts = entry.split(":");
+      const [institutionRaw, degreeRaw, fieldRaw, startYearRaw, endYearRaw] = [
+        parts[0],
+        parts[1],
+        parts[2],
+        parts[3],
+        parts.slice(4).join(":") || undefined,
+      ];
+
+      const startYear = toNumber(startYearRaw);
+      const endYear = toNumber(endYearRaw);
+
+      return {
+        institution: (institutionRaw ?? "").trim(),
+        degree: (degreeRaw ?? "").trim(),
+        fieldOfStudy: (fieldRaw ?? "").trim(),
+        startYear: startYear ?? 0,
+        endYear: endYear,
+      } satisfies Education;
+    })
+    .filter((item) => item.institution.length > 0);
+}
+
+function parseDelimitedAvailability(raw: string): Availability | undefined {
+  const [statusRaw, typeRaw, startDateRaw] = raw.split(":");
+  const status = normaliseAvailabilityStatus(statusRaw);
+  const type = normaliseAvailabilityType(typeRaw);
+  if (!status || !type) {
+    return undefined;
+  }
+  return {
+    status,
+    type,
+    startDate: startDateRaw?.trim() || undefined,
+  } satisfies Availability;
+}
+
+function parseDelimitedLanguages(raw: string): Language[] {
+  return raw
+    .split("|")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [nameRaw, proficiencyRaw] = entry.split(":");
+      return {
+        name: (nameRaw ?? "").trim(),
+        proficiency: normaliseLanguageProficiency(proficiencyRaw),
+      } satisfies Language;
+    })
+    .filter((item) => item.name.length > 0);
+}
+
 function parseSkills(value: unknown): Skill[] {
   const parsed = parseJson<Skill[]>(value);
   if (Array.isArray(parsed)) {
@@ -105,7 +275,12 @@ function parseSkills(value: unknown): Skill[] {
   }
 
   if (typeof value === "string") {
-    return value
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.includes("|") || trimmed.includes(":")) {
+      return parseDelimitedSkills(trimmed);
+    }
+    return trimmed
       .split(/[,;\n]/)
       .map((entry) => entry.trim())
       .filter(Boolean)
@@ -131,6 +306,12 @@ function parseExperience(value: unknown): Experience[] {
       }));
   }
 
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    return parseDelimitedExperience(trimmed);
+  }
+
   return [];
 }
 
@@ -146,6 +327,11 @@ function parseEducation(value: unknown): Education[] {
         startYear: typeof item.startYear === "number" ? item.startYear : 0,
         endYear: typeof item.endYear === "number" ? item.endYear : undefined,
       }));
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    return parseDelimitedEducation(trimmed);
   }
   return [];
 }
@@ -175,8 +361,13 @@ function parseLanguages(value: unknown): Language[] {
       .filter((item) => item && typeof item.name === "string")
       .map((item) => ({
         name: item.name.trim(),
-        proficiency: item.proficiency ?? "Conversational",
+        proficiency: normaliseLanguageProficiency(item.proficiency),
       }));
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    return parseDelimitedLanguages(trimmed);
   }
   return [];
 }
@@ -199,6 +390,11 @@ function parseAvailability(value: unknown): Availability | undefined {
   const parsed = parseJson<Availability>(value);
   if (parsed && parsed.status && parsed.type) {
     return parsed;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    return parseDelimitedAvailability(trimmed);
   }
   return undefined;
 }

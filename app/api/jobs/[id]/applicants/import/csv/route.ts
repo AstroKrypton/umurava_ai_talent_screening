@@ -65,6 +65,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     defaultSource,
   });
 
+  const previewApplicant = applicants.find((applicant) => {
+    const fullName = `${applicant.firstName} ${applicant.lastName}`.trim().toLowerCase();
+    return fullName === "bertin nshuti";
+  });
+
+  if (previewApplicant) {
+    console.log("CSV import preview for Bertin Nshuti:", JSON.stringify(previewApplicant, null, 2));
+  }
+
   if (applicants.length === 0) {
     const message = warnings.length > 0 ? warnings[0].message : "No valid applicants found in CSV.";
     return NextResponse.json({ success: false, error: message, warnings }, { status: 400 });
@@ -91,6 +100,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         updated: (result.modifiedCount ?? 0) + (result.matchedCount ?? 0) - (result.upsertedCount ?? 0),
         totalProcessed: documents.length,
         warnings,
+        previewApplicant,
       },
     });
   } catch (error) {
