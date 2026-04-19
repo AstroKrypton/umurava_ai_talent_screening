@@ -107,11 +107,11 @@ export function OverallScoreGauge({
           className="transition-colors"
         />
       </svg>
-      <div className="relative z-10 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center">
         <span className="text-5xl font-semibold text-slate-900">
           {Math.round(animatedScore)}
         </span>
-        <span className="mt-2 text-xs font-semibold tracking-[0.4em] text-slate-500">
+        <span className="text-xs font-semibold tracking-[0.4em] text-slate-500">
           overall
         </span>
       </div>
