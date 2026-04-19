@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "pdf-parse",
     "express",
     "multer",
+    "framer-motion",
     "papaparse",
     "xlsx",
     "winston",
