@@ -1049,87 +1049,89 @@ export default function JobsWorkspace({
 
       {selectedResult ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-md"
+          className="fixed inset-0 z-[100] overflow-y-auto bg-black/40 backdrop-blur-md"
           onClick={handleCloseResultModal}
           role="presentation"
         >
-          <div
-            className="relative w-full max-w-6xl h-[85vh] overflow-hidden rounded-3xl bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col"
-            onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="flex-shrink-0 bg-[#F5F5F7]">
-              <div className="flex flex-col gap-6 p-8 lg:flex-row lg:items-start lg:justify-between border-b border-slate-200">
-                <div className="flex-1">
-                  <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Candidate spotlight</div>
-                  <h3 className="mt-2 text-2xl font-semibold text-slate-900">{selectedResult.applicantName}</h3>
-                </div>
-                <button
-                  aria-label="Close shortlisted applicant details"
-                  className="rounded-full border border-white/80 bg-white/80 p-2 text-slate-500 transition hover:bg-white hover:text-slate-700"
-                  onClick={handleCloseResultModal}
-                  type="button"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-8 border-b border-slate-200">
-                <div className="rounded-[3rem] border border-white/20 bg-white/70 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 lg:col-span-4">
-                  <div className="flex h-full items-center justify-center">
-                    <OverallScoreGauge className="h-40 w-40 md:h-64 md:w-64" score={selectedResult.overallScore} />
+          <div className="flex min-h-full items-start justify-center p-4 pt-8">
+            <div
+              className="relative w-full max-w-6xl overflow-hidden rounded-3xl bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col max-h-[90vh]"
+              role="dialog"
+              aria-modal="true"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex-shrink-0 bg-[#F5F5F7]">
+                <div className="flex flex-col gap-6 p-8 lg:flex-row lg:items-start lg:justify-between border-b border-slate-200">
+                  <div className="flex-1">
+                    <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Candidate spotlight</div>
+                    <h3 className="mt-2 text-2xl font-semibold text-slate-900">{selectedResult.applicantName}</h3>
                   </div>
+                  <button
+                    aria-label="Close shortlisted applicant details"
+                    className="rounded-full border border-white/80 bg-white/80 p-2 text-slate-500 transition hover:bg-white hover:text-slate-700"
+                    onClick={handleCloseResultModal}
+                    type="button"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <div className="rounded-[3rem] border border-white/20 bg-white/70 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 lg:col-span-8">
-                  <div className="flex flex-col gap-6">
-                    <DetailedProgressBar label="Skills Match" value={selectedResult.skillsScore} />
-                    <DetailedProgressBar label="Experience" value={selectedResult.experienceScore} />
-                    <DetailedProgressBar label="Education" value={selectedResult.educationScore} />
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-8 border-b border-slate-200">
+                  <div className="rounded-[3rem] border border-white/20 bg-white/70 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 lg:col-span-4">
+                    <div className="flex h-full items-center justify-center">
+                      <OverallScoreGauge className="h-40 w-40 md:h-64 md:w-64" score={selectedResult.overallScore} />
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className={`${glassPanelClass} p-5`}>
-                  <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Strengths</div>
-                  <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                    {selectedResult.strengths.map((strength) => (
-                      <li key={strength} className="rounded-2xl bg-[#D1FAE5] px-4 py-2 text-[#065F46]">
-                        {strength}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className={`${glassPanelClass} p-5`}>
-                  <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Gaps</div>
-                  <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                    {selectedResult.gaps.map((gap) => (
-                      <li key={gap} className="rounded-2xl bg-[#FEE2E2] px-4 py-2 text-[#991B1B]">
-                        {gap}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="rounded-[3rem] border border-white/20 bg-white/70 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 lg:col-span-8">
+                    <div className="flex flex-col gap-6">
+                      <DetailedProgressBar label="Skills Match" value={selectedResult.skillsScore} />
+                      <DetailedProgressBar label="Experience" value={selectedResult.experienceScore} />
+                      <DetailedProgressBar label="Education" value={selectedResult.educationScore} />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {selectedResult.insights && selectedResult.insights.length > 0 ? (
+              <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className={`${glassPanelClass} p-5`}>
+                    <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Strengths</div>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      {selectedResult.strengths.map((strength) => (
+                        <li key={strength} className="rounded-2xl bg-[#D1FAE5] px-4 py-2 text-[#065F46]">
+                          {strength}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className={`${glassPanelClass} p-5`}>
+                    <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Gaps</div>
+                    <ul className="mt-3 space-y-2 text-sm text-slate-700">
+                      {selectedResult.gaps.map((gap) => (
+                        <li key={gap} className="rounded-2xl bg-[#FEE2E2] px-4 py-2 text-[#991B1B]">
+                          {gap}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                {selectedResult.insights && selectedResult.insights.length > 0 ? (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Quick insights</div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedResult.insights.map((insight) => (
+                        <span key={insight} className="rounded-full bg-[#E0F2FE] px-3 py-1 text-xs font-medium text-[#0369A1]">
+                          {insight}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Quick insights</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedResult.insights.map((insight) => (
-                      <span key={insight} className="rounded-full bg-[#E0F2FE] px-3 py-1 text-xs font-medium text-[#0369A1]">
-                        {insight}
-                      </span>
-                    ))}
-                  </div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Recommendation</div>
+                  <p className="mt-3 rounded-2xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">{selectedResult.recommendation}</p>
                 </div>
-              ) : null}
-
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Recommendation</div>
-                <p className="mt-3 rounded-2xl bg-white/80 px-4 py-3 text-sm leading-6 text-slate-700">{selectedResult.recommendation}</p>
               </div>
             </div>
           </div>
