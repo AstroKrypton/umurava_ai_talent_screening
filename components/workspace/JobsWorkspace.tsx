@@ -1049,18 +1049,18 @@ export default function JobsWorkspace({
 
       {selectedResult ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-md"
           onClick={handleCloseResultModal}
           role="presentation"
         >
           <div
-            className="relative w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col"
+            className="relative w-full max-w-6xl h-[85vh] overflow-hidden rounded-3xl bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col"
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
           >
-            <div className="flex-shrink-0 border-b border-slate-200 bg-[#F5F5F7] p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+            <div className="flex-shrink-0 bg-[#F5F5F7]">
+              <div className="flex flex-col gap-6 p-8 lg:flex-row lg:items-start lg:justify-between border-b border-slate-200">
                 <div className="flex-1">
                   <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Candidate spotlight</div>
                   <h3 className="mt-2 text-2xl font-semibold text-slate-900">{selectedResult.applicantName}</h3>
@@ -1074,13 +1074,13 @@ export default function JobsWorkspace({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="mt-8 flex flex-col gap-8 md:flex-row">
-                <div className="h-auto rounded-[3rem] border border-white/20 bg-white/60 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 md:h-[26rem] md:p-10">
-                  <div className="flex items-center justify-center">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-8 border-b border-slate-200">
+                <div className="rounded-[3rem] border border-white/20 bg-white/70 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 lg:col-span-4">
+                  <div className="flex h-full items-center justify-center">
                     <OverallScoreGauge className="h-40 w-40 md:h-64 md:w-64" score={selectedResult.overallScore} />
                   </div>
                 </div>
-                <div className="h-auto rounded-[3rem] border border-white/20 bg-white/60 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 md:h-[26rem] md:p-10">
+                <div className="rounded-[3rem] border border-white/20 bg-white/70 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 lg:col-span-8">
                   <div className="flex flex-col gap-6">
                     <DetailedProgressBar label="Skills Match" value={selectedResult.skillsScore} />
                     <DetailedProgressBar label="Experience" value={selectedResult.experienceScore} />
@@ -1090,7 +1090,7 @@ export default function JobsWorkspace({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-8 p-8 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
               <div className="grid gap-6 md:grid-cols-2">
                 <div className={`${glassPanelClass} p-5`}>
                   <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Strengths</div>
