@@ -83,7 +83,7 @@ export function OverallScoreGauge({
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
-        className="absolute inset-0"
+        className="mx-auto"
         role="presentation"
       >
         <circle
@@ -107,37 +107,11 @@ export function OverallScoreGauge({
           className="transition-colors"
         />
       </svg>
-      <div
-        style={{
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          lineHeight: "1",
-          gap: "4px",
-        }}
-      >
-        <span
-          style={{
-            fontSize: "3rem",
-            fontWeight: "700",
-            color: "#0f172a",
-            lineHeight: "1",
-          }}
-        >
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+        <span className="text-6xl font-bold leading-none text-slate-900">
           {Math.round(animatedScore)}
         </span>
-        <span
-          style={{
-            fontSize: "0.7rem",
-            letterSpacing: "0.12em",
-            color: "#94a3b8",
-          }}
-        >
+        <span className="mt-1 text-xs uppercase tracking-widest text-slate-500">
           overall
         </span>
       </div>
