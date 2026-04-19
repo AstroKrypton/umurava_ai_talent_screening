@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LayoutGroup, motion } from "framer-motion";
 import { PencilLine, Trash2, X } from "lucide-react";
 import { buildJobsQuery } from "@/lib/jobs-query";
 import { AIFairnessGuard } from "@/components/jobs/AIFairnessGuard";
@@ -1723,36 +1724,40 @@ export default function JobsWorkspace({
                   </div>
                 </div>
 
-                <div className="mt-6 border-b border-slate-200">
-                  <nav className="flex gap-2" role="tablist">
-                    {tabItems.map((tab) => {
-                      const isActive = activeJobTab === tab.key;
-                      return (
-                        <button
-                          key={tab.key}
-                          className={`relative rounded-t-xl px-4 py-3 text-sm font-semibold transition ${
-                            isActive
-                              ? "text-[#0B4F8A]"
-                              : "text-slate-500 hover:text-slate-700"
-                          }`}
-                          onClick={() => {
-                            openJobDetail(activeJob.id, tab.key);
-                          }}
-                          role="tab"
-                          aria-selected={isActive}
-                          type="button"
-                        >
-                          {tab.label}
-                          <span
-                            aria-hidden="true"
-                            className={`absolute inset-x-0 -bottom-[1px] h-1 rounded-full transition ${
-                              isActive ? "bg-[#0B4F8A]" : "bg-transparent"
+                <div className="mt-6" role="presentation">
+                  <LayoutGroup id="job-detail-tabs">
+                    <div className="bg-slate-50/50 rounded-[24px] p-1.5 border border-slate-100 flex justify-between" role="tablist">
+                      {tabItems.map((tab) => {
+                        const isActive = activeJobTab === tab.key;
+
+                        return (
+                          <button
+                            key={tab.key}
+                            className={`relative flex flex-1 items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold transition ${
+                              isActive
+                                ? "text-[#0B4F8A]"
+                                : "text-slate-500 hover:text-slate-700"
                             }`}
-                          />
-                        </button>
-                      );
-                    })}
-                  </nav>
+                            onClick={() => {
+                              openJobDetail(activeJob.id, tab.key);
+                            }}
+                            role="tab"
+                            aria-selected={isActive}
+                            type="button"
+                          >
+                            <span className="relative z-10">{tab.label}</span>
+                            {isActive ? (
+                              <motion.span
+                                layoutId="tab-active-underline"
+                                transition={{ type: "spring", stiffness: 360, damping: 32 }}
+                                className="absolute inset-x-3 bottom-1 h-1 rounded-full bg-[#0B4F8A]"
+                              />
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </LayoutGroup>
                 </div>
 
                 <div className="mt-6">
