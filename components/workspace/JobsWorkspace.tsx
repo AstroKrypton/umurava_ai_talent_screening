@@ -1074,13 +1074,13 @@ export default function JobsWorkspace({
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
-                <div className="rounded-[3rem] border border-white/20 bg-white/60 p-10 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150">
+              <div className="mt-8 flex flex-col gap-8 md:flex-row">
+                <div className="h-auto rounded-[3rem] border border-white/20 bg-white/60 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 md:h-[26rem] md:p-10">
                   <div className="flex items-center justify-center">
-                    <OverallScoreGauge score={selectedResult.overallScore} />
+                    <OverallScoreGauge className="h-40 w-40 md:h-64 md:w-64" score={selectedResult.overallScore} />
                   </div>
                 </div>
-                <div className="rounded-[3rem] border border-white/20 bg-white/60 p-10 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150">
+                <div className="h-auto rounded-[3rem] border border-white/20 bg-white/60 p-4 shadow-[0_20px_50px_rgba(0,0,0,0.04)] backdrop-blur-3xl backdrop-saturate-150 md:h-[26rem] md:p-10">
                   <div className="flex flex-col gap-6">
                     <DetailedProgressBar label="Skills Match" value={selectedResult.skillsScore} />
                     <DetailedProgressBar label="Experience" value={selectedResult.experienceScore} />
@@ -1467,13 +1467,32 @@ export default function JobsWorkspace({
             </p>
           </div>
         </aside>
+        <nav
+          className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-4 border-t border-white/60 bg-white/90 px-4 py-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600 backdrop-blur-xl shadow-[0_-12px_40px_rgba(15,138,95,0.18)] lg:hidden"
+          aria-label="Workspace quick navigation"
+        >
+          {sidebarItems.map((item) => {
+            const isActive = activeSidebarSection === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => handleSidebarNavigation(item.key)}
+                aria-current={isActive ? "page" : undefined}
+                className={`flex-1 rounded-full px-2 py-2 transition ${isActive ? "bg-[#0F8A5F] text-white shadow-md" : "border border-white/70 bg-white/60"}`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
         <main className="flex-1 px-4 py-6 md:px-8 md:py-10">
-          <div id="workspace-root" className="mx-auto flex max-w-6xl flex-col gap-6 pb-12">
+          <div id="workspace-root" className="mx-auto flex max-w-6xl flex-col gap-6 pb-28 lg:pb-12">
             <div className={`${glassPanelClass} px-6 py-6`}>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">Recruiter workspace</p>
-                  <h1 className="mt-2 text-3xl font-semibold text-slate-900">Jobs & AI Shortlists</h1>
+                  <h1 className="mt-2 pt-20 text-3xl font-semibold text-slate-900 md:pt-0">Jobs & AI Shortlists</h1>
                   <p className="mt-3 max-w-2xl text-sm text-slate-600">
                     Structure each role, ingest applicants, and compare AI-ranked talent with full transparency.
                   </p>

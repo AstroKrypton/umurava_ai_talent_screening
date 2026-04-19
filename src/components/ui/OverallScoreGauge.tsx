@@ -71,7 +71,7 @@ export function OverallScoreGauge({
 
   const strokeDashoffset = circumference * (1 - animatedPercent / 100);
   const containerClass = [
-    "relative flex h-44 w-44 items-center justify-center overflow-hidden rounded-[3rem] bg-white/40 p-6 text-center backdrop-blur-3xl shadow-[0_30px_80px_rgba(15,138,95,0.12)]",
+    "relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-[3rem] bg-white/40 p-6 text-center backdrop-blur-3xl shadow-[0_30px_80px_rgba(15,138,95,0.12)] md:h-64 md:w-64",
     className,
   ]
     .filter(Boolean)
