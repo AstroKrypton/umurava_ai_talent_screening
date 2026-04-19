@@ -110,30 +110,32 @@ export function OverallScoreGauge({
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          gap: "2px",
+          lineHeight: "1",
+          gap: "4px",
         }}
       >
         <span
           style={{
             fontSize: "3rem",
             fontWeight: "700",
-            lineHeight: "1",
             color: "#0f172a",
+            lineHeight: "1",
           }}
         >
           {Math.round(animatedScore)}
         </span>
         <span
           style={{
-            fontSize: "0.75rem",
-            letterSpacing: "0.15em",
+            fontSize: "0.7rem",
+            letterSpacing: "0.12em",
             color: "#94a3b8",
-            textTransform: "lowercase",
           }}
         >
           overall
