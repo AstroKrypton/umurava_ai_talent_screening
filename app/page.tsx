@@ -8,7 +8,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#F5F5F7]">
       <Navbar />
-      <section className="h-screen flex flex-col items-center justify-center text-center px-4">
+      <section className="flex flex-col items-center justify-center px-4 text-center mt-20 md:mt-32 lg:mt-36">
         <div className="inline-flex items-center gap-2 bg-[#E8F3FC] text-[#0B4F8A] text-xs font-semibold px-4 py-1.5 rounded-full mb-6">
           <span className="w-1.5 h-1.5 bg-[#0B4F8A] rounded-full"></span>
           Built for Africa&apos;s talent market
