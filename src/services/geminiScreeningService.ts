@@ -84,8 +84,11 @@ const RETRYABLE_STATUS_CODES = new Set([429, 503]);
 const MODEL_FALLBACK_CHAIN = [
   getGeminiModelName(),
   "gemini-2.5-flash",
-  "gemini-3-flash-preview",
+  "gemini-2.5-flash-lite",
   "gemini-2.5-pro",
+  "gemini-3-flash-preview",
+  "gemini-3.1-pro-preview",
+  "gemini-2.5-flash-001",
 ];
 
 function dedupeModels(modelNames: string[]) {
