@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PencilLine, Trash2, X } from "lucide-react";
 import { buildJobsQuery } from "@/lib/jobs-query";
 import { AIFairnessGuard } from "@/components/jobs/AIFairnessGuard";
 import { EscaladeLoader } from "@/src/components/ui/EscaladeLoader";
 import { OverallScoreGauge } from "@/src/components/ui/OverallScoreGauge";
 import { useMounted } from "@/src/hooks/useMounted";
+import { InclusionInsightsModal } from "@/components/workspace/InclusionInsightsModal";
+import type { InclusionInsightsReport } from "@/src/types/insights";
 
 type JobRecord = {
   id: string;
@@ -196,6 +198,11 @@ export default function JobsWorkspace({
   const [isLoadingScreeningDetail, setIsLoadingScreeningDetail] = useState(false);
   const [screeningDetailError, setScreeningDetailError] = useState("");
   const [selectedResult, setSelectedResult] = useState<ScreeningResultDetail | null>(null);
+  const [insightsModalOpen, setInsightsModalOpen] = useState(false);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [insightsReport, setInsightsReport] = useState<InclusionInsightsReport | null>(null);
+  const [insightsShortlistId, setInsightsShortlistId] = useState<string | null>(null);
   const scoreBars = useMemo(
     () =>
       selectedResult
@@ -1016,6 +1023,73 @@ export default function JobsWorkspace({
   const selectedDetail = selectedScreening ? screeningDetails[selectedScreening] : undefined;
   const isActiveJobProcessing = activeJob ? processingJobId === activeJob.id : false;
 
+  const clearInsightsState = useCallback(() => {
+    setInsightsLoading(false);
+    setInsightsError(null);
+    setInsightsReport(null);
+    setInsightsShortlistId(null);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDetail) {
+      setInsightsModalOpen(false);
+      clearInsightsState();
+      return;
+    }
+
+    if (insightsShortlistId && insightsShortlistId !== selectedDetail.id) {
+      clearInsightsState();
+    }
+  }, [clearInsightsState, insightsShortlistId, selectedDetail]);
+
+  const fetchInclusionInsights = useCallback(async (detail: ScreeningDetailRecord) => {
+    setInsightsLoading(true);
+    setInsightsError(null);
+    try {
+      const response = await fetch("/api/shortlist/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shortlistId: detail.id,
+          shortlist: detail.results,
+          jobId: detail.jobId,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error ?? "Unable to calculate inclusion metrics right now.");
+      }
+
+      const payload = (await response.json()) as InclusionInsightsReport;
+      setInsightsReport(payload);
+      setInsightsShortlistId(detail.id);
+    } catch (error) {
+      console.error("Failed to fetch inclusion insights", error);
+      setInsightsError(error instanceof Error ? error.message : "Unexpected error while fetching inclusion metrics.");
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, []);
+
+  const handleOpenInclusionInsights = useCallback(() => {
+    if (!selectedDetail) return;
+    setInsightsModalOpen(true);
+    if (insightsShortlistId !== selectedDetail.id || !insightsReport) {
+      void fetchInclusionInsights(selectedDetail);
+    }
+  }, [fetchInclusionInsights, insightsReport, insightsShortlistId, selectedDetail]);
+
+  const handleCloseInclusionInsights = useCallback(() => {
+    setInsightsModalOpen(false);
+  }, []);
+
+  const handleRetryInclusionInsights = useCallback(() => {
+    if (!selectedDetail) return;
+    setInsightsError(null);
+    void fetchInclusionInsights(selectedDetail);
+  }, [fetchInclusionInsights, selectedDetail]);
+
   const tabItems: Array<{ key: "overview" | "applicants" | "shortlist"; label: string }> = [
     { key: "overview", label: "Job Overview" },
     { key: "applicants", label: "Applicant Pool" },
@@ -1031,8 +1105,18 @@ export default function JobsWorkspace({
 
   return (
     <>
+      <InclusionInsightsModal
+        isOpen={insightsModalOpen}
+        onClose={handleCloseInclusionInsights}
+        onRetry={handleRetryInclusionInsights}
+        report={insightsReport}
+        isLoading={insightsLoading}
+        error={insightsError}
+      />
       {toast ? (
-        <div className={`fixed right-6 top-6 z-[80] ${glassPanelClass} flex max-w-sm items-start gap-3 px-5 py-4 text-slate-800`}>
+        <div
+          className={`fixed right-6 top-6 z-[80] ${glassPanelClass} flex max-w-sm items-start gap-3 px-5 py-4 text-slate-800`}
+        >
           <div
             className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
               toast.variant === "success"
@@ -2026,13 +2110,25 @@ export default function JobsWorkspace({
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Shortlist detail</div>
                             {selectedDetail && selectedDetail.results.length > 0 ? (
-                              <button
-                                className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-white"
-                                onClick={handleExportShortlist}
-                                type="button"
-                              >
-                                Export CSV
-                              </button>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  className="flex items-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 to-teal-500 px-4 py-2 text-sm font-medium text-white transition-all hover:opacity-90"
+                                  onClick={handleOpenInclusionInsights}
+                                  type="button"
+                                >
+                                  <span aria-hidden="true" role="img">
+                                    ✨
+                                  </span>
+                                  Inclusion Insights
+                                </button>
+                                <button
+                                  className="rounded-full border border-white/80 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 transition hover:bg-white"
+                                  onClick={handleExportShortlist}
+                                  type="button"
+                                >
+                                  Export CSV
+                                </button>
+                              </div>
                             ) : null}
                           </div>
                           <div className="space-y-3">

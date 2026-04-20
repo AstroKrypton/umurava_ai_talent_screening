@@ -18,6 +18,7 @@
     "gsap": "^3.14.2",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^1.8.0",
+    "framer-motion": "^11.0.17",
     "mongoose": "^9.4.1",
     "next": "16.2.3",
     "react": "19.2.4",
