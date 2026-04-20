@@ -31,10 +31,11 @@ _Updated to reflect official Umurava Talent Profile Schema_
 4. [MongoDB Collections & Mongoose Models](#4-mongodb-collections--mongoose-models)
 5. [TypeScript Type Definitions](#5-typescript-type-definitions)
 6. [Core Logic](#6-core-logic)
-7. [API Design](#7-api-design)
-8. [Development Tasks & Sub-Tasks](#8-development-tasks--sub-tasks)
-9. [Environment Variables Reference](#9-environment-variables-reference)
-10. [Assumptions & Limitations](#10-assumptions--limitations)
+7. [Inclusion Insights](#7-inclusion-insights)
+8. [API Design](#8-api-design)
+9. [Development Tasks & Sub-Tasks](#9-development-tasks--sub-tasks)
+10. [Environment Variables Reference](#10-environment-variables-reference)
+11. [Assumptions & Limitations](#11-assumptions--limitations)
 
 ---
 
@@ -632,7 +633,7 @@ export interface TalentProfile {
   resumeUrl?: string;
   rawResumeText?: string;
 }
-6. Core Logic
+## 6. Core Logic
 6.1 Candidate Scoring Algorithm
 The scoring engine computes a composite score (0–100) using these weighted dimensions:
 
@@ -743,7 +744,41 @@ socialLinks{linkedin, github, portfolio}
 For skill level, infer from context: Expert/Advanced/Intermediate/Beginner.
 
 Return ONLY valid JSON. No markdown.
-7. API Design
+## 7. Inclusion Insights
+
+The Inclusion Insights module gives recruiters a fast, AI-assisted read on how balanced each shortlist is before they share it with stakeholders.
+
+### 7.1 User Experience
+
+- **Entry point:** A dedicated "Inclusion Insights" button appears on every completed screening within the Jobs Workspace shortlist view @components/workspace/JobsWorkspace.tsx#239-1385.
+- **Modal presentation:** Clicking the entry point opens a glassmorphism modal with motion-powered cards @components/workspace/InclusionInsightsModal.tsx#1-183.
+- **State handling:** The modal supports loading, error, and success states with graceful fallbacks, including a retry action for transient API failures @components/workspace/InclusionInsightsModal.tsx#108-176.
+- **CSV context:** When insights are available, the shortlist export continues to include the qualitative insight tokens to preserve context in offline reviews @components/workspace/JobsWorkspace.tsx#1225-1237.
+
+### 7.2 Metrics & Output Schema
+
+- **Inclusion Score (0–100):** Rounded percentage that quantifies perceived balance across the shortlist.
+- **Skill Diversity Index (0–100):** Highlights variation in technical skillsets represented.
+- **Education Neutrality:** Text classification indicating the mix between traditional and non-traditional educational backgrounds.
+- **Inclusion Summary:** Short narrative explaining why the ranking remains merit-first.
+- **Justification:** Optional 200-character rationale retained for audit trails.
+- **Source Metadata:** Responses are tagged with the Gemini model source when present.
+
+A shared TypeScript contract documents this payload as `InclusionInsightsReport` @src/types/insights.ts#1-13.
+
+### 7.3 Backend Orchestration
+
+- **Endpoint:** `POST /api/shortlist/insights` receives the shortlist array and an identifier @app/api/shortlist/insights/route.ts#113-164.
+- **Gemini fallback chain:** The route deduplicates model candidates and retries transient failures with exponential backoff @app/api/shortlist/insights/route.ts#5-111.
+- **Response sanitation:** The handler strips fences, parses JSON fragments, clamps numeric values to safe ranges, and slices long prose fields before returning the report @app/api/shortlist/insights/route.ts#65-158.
+- **Error handling:** Clear 4xx responses guard against invalid input, while unavailable Gemini credentials surface a 503 status.
+
+### 7.4 Trigger Conditions & Persistence
+
+- Insights are requested on-demand per shortlist and cached in component state; subsequent opens skip the network call unless another screening is selected @components/workspace/JobsWorkspace.tsx#1293-1361.
+- The feature intentionally avoids server-side persistence today; future iterations may snapshot insights alongside screening results for auditability.
+
+## 8. API Design
 All endpoints prefixed with /api. JWT Bearer token authentication. Responses: { success, data, error }.
 
 7.1 Auth
@@ -771,7 +806,7 @@ POST /api/screenings	Trigger screening — body: { jobId }
 GET /api/screenings/:id	Status + results when complete
 GET /api/jobs/:jobId/screenings	Screening history
 POST /api/screenings/:id/retry	Retry failed screening
-8. Development Tasks & Sub-Tasks
+## 9. Development Tasks & Sub-Tasks
 Tasks divided by role. Complexity: S = 2–4 hrs, M = 4–8 hrs, L = 1–2 days. All tasks reference the official Umurava schema field names.
 
 FRONTEND ENGINEER
@@ -1056,7 +1091,7 @@ Note in README: all profiles follow official Umurava Talent Profile Schema Speci
 
 2-slide deck: slide 1 = product demo, slide 2 = AI decision flow using official schema fields
 
-9. Environment Variables Reference
+## 10. Environment Variables Reference
 9.1 Backend (.env)
 Variable	Description
 PORT	Server port, default 4000
@@ -1072,7 +1107,7 @@ NODE_ENV	development | production
 Variable	Description
 NEXT_PUBLIC_API_URL	Backend base URL
 NEXT_PUBLIC_APP_NAME	e.g. Umurava AI Screening
-10. Assumptions & Limitations
+## 11. Assumptions & Limitations
 10.1 Schema Compliance
 All dummy profiles and real Umurava profiles must use the exact field names from the official schema specification
 
