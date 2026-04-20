@@ -23,7 +23,7 @@ export interface ScreeningExecutionResult {
   aiModelVersion: string;
   promptVersion: string;
   usedFallback: boolean;
-  errorMessage?: string;
+  error?: string;
 }
 
 function buildPrompt(job: JobForScreening, applicants: ApplicantForScreening[]) {
@@ -83,12 +83,12 @@ const BASE_RETRY_DELAY_MS = 600;
 const RETRYABLE_STATUS_CODES = new Set([429, 503]);
 const MODEL_FALLBACK_CHAIN = [
   getGeminiModelName(),
+  "gemini-2.5-flash",           
+  "gemini-2.5-flash-latest",
+  "gemini-2.5-pro",
   "gemini-3-flash-preview",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash",        
-  "gemini-1.5-flash-latest",  
-  "gemini-1.5-pro-latest",    
-  "gemini-1.5-pro"
+  "gemini-1.5-flash-latest",
+  "gemini-1.5-pro-latest", 
 ];
 
 function dedupeModels(modelNames: string[]) {
@@ -193,7 +193,7 @@ async function runGeminiScreening(job: JobForScreening, applicants: ApplicantFor
     processingTimeMs,
     aiModelVersion: modelName,
     promptVersion: PROMPT_VERSION,
-  } satisfies Omit<ScreeningExecutionResult, "usedFallback" | "errorMessage">;
+  } satisfies Omit<ScreeningExecutionResult, "usedFallback" | "error">;
 }
 
 export async function executeScreening(job: JobForScreening, applicants: ApplicantForScreening[]): Promise<ScreeningExecutionResult> {
@@ -205,7 +205,7 @@ export async function executeScreening(job: JobForScreening, applicants: Applica
       aiModelVersion: "heuristic-v1",
       promptVersion: "manual-heuristic",
       usedFallback: true,
-      errorMessage: "Gemini API key is not configured.",
+      error: "Gemini API key is not configured.",
     };
   }
 
@@ -228,7 +228,7 @@ export async function executeScreening(job: JobForScreening, applicants: Applica
       aiModelVersion: "heuristic-v1",
       promptVersion: "manual-heuristic",
       usedFallback: true,
-      errorMessage: message,
+      error: message,
     };
   }
 }

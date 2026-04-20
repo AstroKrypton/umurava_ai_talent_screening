@@ -64,7 +64,7 @@ export async function POST(request: Request) {
     screening.aiModelVersion = execution.aiModelVersion;
     screening.promptVersion = execution.promptVersion;
     screening.processingTimeMs = execution.processingTimeMs;
-    screening.errorMessage = execution.usedFallback ? execution.errorMessage : undefined;
+    screening.error = execution.usedFallback ? execution.error : undefined;
     await screening.save();
 
     await JobModel.updateOne({ _id: jobId }, { status: "screening" });
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
           aiModelVersion: screening.aiModelVersion,
           promptVersion: screening.promptVersion,
           usedFallback: execution.usedFallback,
-          errorMessage: screening.errorMessage,
+          error: screening.error,
         },
       },
       { status: 201 },
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof ScreeningSystemLimitError) {
       screening.status = "failed";
-      screening.errorMessage = error.message;
+      screening.error = error.message;
       await screening.save();
 
       revalidateJobsListing();
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
 
     const message = error instanceof Error ? error.message : "Unknown screening error";
     screening.status = "failed";
-    screening.errorMessage = message;
+    screening.error = message;
     await screening.save();
 
     revalidateJobsListing();

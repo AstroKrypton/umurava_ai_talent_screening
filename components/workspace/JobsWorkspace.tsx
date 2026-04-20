@@ -27,6 +27,14 @@ type JobRecord = {
   updatedAt?: string;
 };
 
+const SCREENING_STORAGE_KEY = "umurava.activeScreening";
+const SCREENING_POLL_INTERVAL_MS = 4000;
+
+type StoredScreeningSession = {
+  screeningId: string;
+  jobId: string;
+};
+
 type ScreeningRecord = {
   id: string;
   status: "pending" | "processing" | "completed" | "failed";
@@ -37,7 +45,7 @@ type ScreeningRecord = {
   aiModelVersion?: string;
   promptVersion?: string;
   usedFallback?: boolean;
-  errorMessage?: string;
+  error?: string;
 };
 
 type ScreeningResultDetail = {
@@ -67,8 +75,37 @@ type ScreeningDetailRecord = {
   aiModelVersion?: string;
   promptVersion?: string;
   usedFallback?: boolean;
-  errorMessage?: string;
+  error?: string;
   createdAt: string;
+};
+
+type ScreeningApiPayload = {
+  id: string;
+  jobId?: string;
+  status: ScreeningRecord["status"];
+  totalApplicants: number;
+  shortlistSize: 10 | 20;
+  results: ScreeningResultDetail[];
+  processingTimeMs?: number;
+  aiModelVersion?: string;
+  promptVersion?: string;
+  usedFallback?: boolean;
+  error?: string;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+type ScreeningStatusResponse = {
+  success: boolean;
+  data?: ScreeningApiPayload;
+  error?: string;
+};
+
+type ScreeningStartResponse = {
+  success: boolean;
+  data?: { id: string; jobId?: string; status: ScreeningRecord["status"]; createdAt: string };
+  error?: string;
+  message?: string;
 };
 
 type CsvImportSummary = {
@@ -228,6 +265,7 @@ export default function JobsWorkspace({
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const screeningPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingDeleteJob, setPendingDeleteJob] = useState<JobRecord | null>(null);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const isJobDialogOpen = jobDialogMode !== null;
@@ -293,13 +331,206 @@ export default function JobsWorkspace({
     setToast(null);
   }
 
+  const clearScreeningPollTimer = useCallback(() => {
+    if (screeningPollTimerRef.current) {
+      clearTimeout(screeningPollTimerRef.current);
+      screeningPollTimerRef.current = null;
+    }
+  }, []);
+
+  const persistActiveScreening = useCallback((session: StoredScreeningSession | null) => {
+    if (typeof window === "undefined") return;
+    if (!session) {
+      window.localStorage.removeItem(SCREENING_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(SCREENING_STORAGE_KEY, JSON.stringify(session));
+    }
+  }, []);
+
+  const mapApiPayloadToDetail = useCallback(
+    (payload: ScreeningApiPayload, fallbackJobId?: string): ScreeningDetailRecord => {
+      const jobIdentifier = payload.jobId ?? fallbackJobId ?? "";
+
+      return {
+        id: payload.id,
+        jobId: jobIdentifier,
+        status: payload.status,
+        totalApplicants: payload.totalApplicants,
+        shortlistSize: payload.shortlistSize,
+        results: Array.isArray(payload.results) ? payload.results : [],
+        processingTimeMs: payload.processingTimeMs,
+        aiModelVersion: payload.aiModelVersion,
+        promptVersion: payload.promptVersion,
+        usedFallback: payload.usedFallback,
+        error: payload.error,
+        createdAt: payload.createdAt,
+      };
+    },
+    [],
+  );
+
+  const commitScreeningDetail = useCallback((detail: ScreeningDetailRecord) => {
+    if (!detail.jobId) return;
+
+    setScreeningDetails((current) => ({
+      ...current,
+      [detail.id]: detail,
+    }));
+
+    const summary: ScreeningRecord = {
+      id: detail.id,
+      status: detail.status,
+      createdAt: detail.createdAt,
+      totalApplicants: detail.totalApplicants,
+      shortlistSize: detail.shortlistSize,
+      processingTimeMs: detail.processingTimeMs,
+      aiModelVersion: detail.aiModelVersion,
+      promptVersion: detail.promptVersion,
+      usedFallback: detail.usedFallback,
+      error: detail.error,
+    };
+
+    setScreenings((current) => {
+      const existing = current[detail.jobId] ?? [];
+      const withoutDuplicate = existing.filter((entry) => entry.id !== summary.id);
+      return {
+        ...current,
+        [detail.jobId]: [summary, ...withoutDuplicate],
+      };
+    });
+
+    setScreeningsVisibleCount((current) => ({
+      ...current,
+      [detail.jobId]: Math.max(current[detail.jobId] ?? DEFAULT_SCREENING_BATCH, DEFAULT_SCREENING_BATCH),
+    }));
+  }, []);
+
+  const pollScreeningStatus = useCallback(
+    async (session: StoredScreeningSession) => {
+      try {
+        const response = await fetch(`/api/screen/${session.screeningId}`);
+        const payload = (await response.json()) as ScreeningStatusResponse;
+
+        if (!response.ok || !payload.success || !payload.data) {
+          const message = payload?.error || "Unable to retrieve screening status.";
+          setFormError(message);
+          setScreeningDetailError(message);
+          showToast({
+            title: "Screening failed",
+            description: message,
+            variant: "error",
+          });
+          persistActiveScreening(null);
+          clearScreeningPollTimer();
+          setProcessingJobId((current) => (current === session.jobId ? null : current));
+          return;
+        }
+
+        const data = payload.data;
+        const detail = mapApiPayloadToDetail(data, session.jobId);
+
+        if (data.status === "completed") {
+          commitScreeningDetail(detail);
+          setSelectedScreening(detail.id);
+          setSelectedResult(null);
+          setScreeningDetailError("");
+
+          const jobTitle = jobs.find((job) => job.id === detail.jobId)?.title ?? "this role";
+          showToast({
+            title: "Screening complete",
+            description: `AI shortlist generated for ${jobTitle}.`,
+            variant: "success",
+          });
+
+          persistActiveScreening(null);
+          clearScreeningPollTimer();
+          setProcessingJobId((current) => (current === session.jobId ? null : current));
+          void refreshJobs();
+          return;
+        }
+
+        if (data.status === "failed") {
+          commitScreeningDetail(detail);
+          const message = detail.error || "Screening failed. Try again shortly.";
+          setFormError(message);
+          setScreeningDetailError(message);
+          showToast({
+            title: "Screening failed",
+            description: message,
+            variant: "error",
+          });
+
+          persistActiveScreening(null);
+          clearScreeningPollTimer();
+          setProcessingJobId((current) => (current === session.jobId ? null : current));
+          void refreshJobs();
+          return;
+        }
+
+        commitScreeningDetail(detail);
+        setProcessingJobId(session.jobId);
+        persistActiveScreening(session);
+        clearScreeningPollTimer();
+        screeningPollTimerRef.current = setTimeout(() => {
+          void pollScreeningStatus(session);
+        }, SCREENING_POLL_INTERVAL_MS);
+      } catch (error) {
+        console.error("Failed to poll screening status", error);
+        clearScreeningPollTimer();
+        setProcessingJobId(session.jobId);
+        persistActiveScreening(session);
+        screeningPollTimerRef.current = setTimeout(() => {
+          void pollScreeningStatus(session);
+        }, SCREENING_POLL_INTERVAL_MS * 2);
+      }
+    },
+    [
+      clearScreeningPollTimer,
+      commitScreeningDetail,
+      jobs,
+      mapApiPayloadToDetail,
+      persistActiveScreening,
+      refreshJobs,
+      setScreeningDetailError,
+      setFormError,
+      showToast,
+      pollScreeningStatus,
+    ],
+  );
+
   useEffect(() => {
     return () => {
       if (toastTimerRef.current) {
         clearTimeout(toastTimerRef.current);
       }
+      clearScreeningPollTimer();
     };
-  }, []);
+  }, [clearScreeningPollTimer]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const stored = window.localStorage.getItem(SCREENING_STORAGE_KEY);
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored) as StoredScreeningSession | null;
+      if (!parsed || !parsed.screeningId || !parsed.jobId) {
+        window.localStorage.removeItem(SCREENING_STORAGE_KEY);
+        return;
+      }
+
+      setProcessingJobId(parsed.jobId);
+      setScreeningDetailError("");
+      setSelectedResult(null);
+      clearScreeningPollTimer();
+      screeningPollTimerRef.current = setTimeout(() => {
+        void pollScreeningStatus(parsed);
+      }, 200);
+    } catch {
+      window.localStorage.removeItem(SCREENING_STORAGE_KEY);
+    }
+  }, [clearScreeningPollTimer, pollScreeningStatus]);
 
   const filteredJobs = useMemo(() => {
     if (statusFilter === "all") return jobs;
@@ -489,12 +720,8 @@ export default function JobsWorkspace({
     setScreeningDetailError("");
 
     try {
-      const response = await fetch(`/api/screenings/${screeningId}`);
-      const payload = (await response.json()) as {
-        success: boolean;
-        data?: ScreeningDetailRecord;
-        error?: string;
-      };
+      const response = await fetch(`/api/screen/${screeningId}`);
+      const payload = (await response.json()) as ScreeningStatusResponse;
 
       if (!response.ok || !payload.success || !payload.data) {
         const message = payload.error || "Unable to load screening details.";
@@ -503,11 +730,9 @@ export default function JobsWorkspace({
         return;
       }
 
-      setScreeningDetails((current) => ({
-        ...current,
-        [screeningId]: payload.data!,
-      }));
-      setSelectedScreening(screeningId);
+      const detail = mapApiPayloadToDetail(payload.data, jobId);
+      commitScreeningDetail(detail);
+      setSelectedScreening(detail.id);
       if (!screenings[jobId]) {
         void refreshScreenings(jobId);
       }
@@ -846,19 +1071,15 @@ export default function JobsWorkspace({
     }
     setProcessingJobId(jobId);
 
+    let started = false;
     try {
-      const response = await fetch(`/api/screenings`, {
+      const response = await fetch(`/api/screen`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId }),
       });
 
-      const payload = (await response.json()) as {
-        success: boolean;
-        data?: (Omit<ScreeningDetailRecord, "jobId"> & { jobId?: string }) | null;
-        error?: string;
-        message?: string;
-      };
+      const payload = (await response.json()) as ScreeningStartResponse;
 
       if (!response.ok || !payload.success || !payload.data) {
         const errorMessage = payload.message || payload.error || "Unable to run screening.";
@@ -871,61 +1092,26 @@ export default function JobsWorkspace({
         return;
       }
 
-      const detail: ScreeningDetailRecord = {
-        ...payload.data,
+      started = true;
+      const session: StoredScreeningSession = {
+        screeningId: payload.data.id,
         jobId,
-        results: payload.data.results ?? [],
       };
 
-      const summary: ScreeningRecord = {
-        id: detail.id,
-        status: detail.status,
-        createdAt: detail.createdAt,
-        totalApplicants: detail.totalApplicants,
-        shortlistSize: detail.shortlistSize,
-        processingTimeMs: detail.processingTimeMs,
-        aiModelVersion: detail.aiModelVersion,
-        promptVersion: detail.promptVersion,
-        errorMessage: detail.errorMessage,
-      };
-
-      setScreenings((current) => {
-        const existing = current[jobId] ?? [];
-        const withoutDuplicate = existing.filter((entry) => entry.id !== summary.id);
-        return {
-          ...current,
-          [jobId]: [summary, ...withoutDuplicate],
-        };
-      });
-
-      setScreeningDetails((current) => ({
-        ...current,
-        [detail.id]: detail,
-      }));
-
-      setSelectedScreening(detail.id);
+      persistActiveScreening(session);
       setSelectedResult(null);
       setScreeningDetailError("");
-      setScreeningsVisibleCount((current) => ({
-        ...current,
-        [jobId]: Math.max(current[jobId] ?? DEFAULT_SCREENING_BATCH, DEFAULT_SCREENING_BATCH),
-      }));
+      setSelectedScreening(null);
+      clearScreeningPollTimer();
+      screeningPollTimerRef.current = setTimeout(() => {
+        void pollScreeningStatus(session);
+      }, 200);
 
-      if (detail.usedFallback && detail.errorMessage) {
-        setFormError(detail.errorMessage);
-        showToast({
-          title: "Shortlist generated with warnings",
-          description: detail.errorMessage,
-          variant: "warning",
-        });
-      } else {
-        showToast({
-          title: "Screening complete",
-          description: `AI shortlist generated for ${job.title}.`,
-          variant: "success",
-        });
-      }
-      void refreshJobs();
+      showToast({
+        title: "Screening launched",
+        description: `We’ll refresh ${job.title} once the AI shortlist is ready.`,
+        variant: "info",
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Something went wrong while running the screening.";
@@ -936,7 +1122,11 @@ export default function JobsWorkspace({
         variant: "error",
       });
     } finally {
-      setProcessingJobId(null);
+      if (!started) {
+        setProcessingJobId((current) => (current === jobId ? null : current));
+        persistActiveScreening(null);
+        clearScreeningPollTimer();
+      }
     }
   }
 

@@ -49,7 +49,8 @@ const screeningSchema = new Schema(
     aiModelVersion: { type: String, trim: true },
     promptVersion: { type: String, trim: true },
     processingTimeMs: { type: Number },
-    errorMessage: { type: String, trim: true },
+    usedFallback: { type: Boolean, default: false },
+    error: { type: String, trim: true },
   },
   {
     timestamps: true,
