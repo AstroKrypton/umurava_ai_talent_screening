@@ -818,7 +818,21 @@ export default function JobsWorkspace({
 
   async function handleRunScreening(jobId: string | null) {
     if (!jobId) return;
-    if (processingJobId) return;
+
+    if (processingJobId) {
+      const inFlightJob = jobs.find((item) => item.id === processingJobId);
+      showToast({
+        title: "Screening in progress",
+        description:
+          processingJobId === jobId
+            ? "We’re already generating this shortlist. Hang tight while the AI finishes."
+            : inFlightJob
+              ? `${inFlightJob.title} is currently running. Start another screening once it completes.`
+              : "Another screening is currently running. Please wait until it finishes.",
+        variant: "info",
+      });
+      return;
+    }
 
     const job = jobs.find((item) => item.id === jobId);
     if (!job) return;
@@ -843,10 +857,17 @@ export default function JobsWorkspace({
         success: boolean;
         data?: (Omit<ScreeningDetailRecord, "jobId"> & { jobId?: string }) | null;
         error?: string;
+        message?: string;
       };
 
       if (!response.ok || !payload.success || !payload.data) {
-        setFormError(payload.error || "Unable to run screening.");
+        const errorMessage = payload.message || payload.error || "Unable to run screening.";
+        setFormError(errorMessage);
+        showToast({
+          title: "Screening not started",
+          description: errorMessage,
+          variant: "error",
+        });
         return;
       }
 
@@ -892,6 +913,11 @@ export default function JobsWorkspace({
 
       if (detail.usedFallback && detail.errorMessage) {
         setFormError(detail.errorMessage);
+        showToast({
+          title: "Shortlist generated with warnings",
+          description: detail.errorMessage,
+          variant: "warning",
+        });
       } else {
         showToast({
           title: "Screening complete",
@@ -900,8 +926,15 @@ export default function JobsWorkspace({
         });
       }
       void refreshJobs();
-    } catch {
-      setFormError("Something went wrong while running the screening.");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Something went wrong while running the screening.";
+      setFormError(message);
+      showToast({
+        title: "Screening not started",
+        description: message,
+        variant: "error",
+      });
     } finally {
       setProcessingJobId(null);
     }
