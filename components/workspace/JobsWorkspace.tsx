@@ -28,7 +28,8 @@ type JobRecord = {
 };
 
 const SCREENING_STORAGE_KEY = "umurava.activeScreening";
-const SCREENING_POLL_INTERVAL_MS = 4000;
+const SCREENING_POLL_INTERVAL_MS = 3000;
+const SCREENING_MAX_POLL_RETRIES = 20;
 
 type StoredScreeningSession = {
   screeningId: string;
@@ -266,6 +267,7 @@ export default function JobsWorkspace({
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const screeningPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const screeningPollAttemptsRef = useRef(0);
   const [pendingDeleteJob, setPendingDeleteJob] = useState<JobRecord | null>(null);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const isJobDialogOpen = jobDialogMode !== null;
@@ -336,6 +338,7 @@ export default function JobsWorkspace({
       clearTimeout(screeningPollTimerRef.current);
       screeningPollTimerRef.current = null;
     }
+    screeningPollAttemptsRef.current = 0;
   }, []);
 
   const persistActiveScreening = useCallback((session: StoredScreeningSession | null) => {
@@ -406,7 +409,47 @@ export default function JobsWorkspace({
   }, []);
 
   const pollScreeningStatus = useCallback(
-    async function poll(session: StoredScreeningSession): Promise<void> {
+    async function poll(session: StoredScreeningSession, attempt = 0): Promise<void> {
+      if (attempt >= SCREENING_MAX_POLL_RETRIES) {
+        const timeoutMessage = "Screening is taking longer than expected. Please try again.";
+        setFormError(timeoutMessage);
+        setScreeningDetailError(timeoutMessage);
+        showToast({
+          title: "Screening timed out",
+          description: timeoutMessage,
+          variant: "error",
+        });
+
+        setScreenings((current) => {
+          const jobScreenings = current[session.jobId] ?? [];
+          const updated: ScreeningRecord[] = jobScreenings.map((entry) =>
+            entry.id === session.screeningId
+              ? ({ ...entry, status: "failed" as const, error: timeoutMessage } as ScreeningRecord)
+              : entry,
+          );
+          return { ...current, [session.jobId]: updated };
+        });
+
+        setScreeningDetails((current) => {
+          const existing = current[session.screeningId];
+          if (!existing) return current;
+          return {
+            ...current,
+            [session.screeningId]: {
+              ...existing,
+              status: "failed" as const,
+              error: timeoutMessage,
+            } as ScreeningDetailRecord,
+          };
+        });
+
+        persistActiveScreening(null);
+        clearScreeningPollTimer();
+        setProcessingJobId((current) => (current === session.jobId ? null : current));
+        return;
+      }
+
+      screeningPollAttemptsRef.current = attempt;
       try {
         const response = await fetch(`/api/screen/${session.screeningId}`);
         const payload = (await response.json()) as ScreeningStatusResponse;
@@ -434,6 +477,7 @@ export default function JobsWorkspace({
           setSelectedScreening(detail.id);
           setSelectedResult(null);
           setScreeningDetailError("");
+          screeningPollAttemptsRef.current = 0;
 
           const jobTitle = jobs.find((job) => job.id === detail.jobId)?.title ?? "this role";
           showToast({
@@ -472,7 +516,7 @@ export default function JobsWorkspace({
         persistActiveScreening(session);
         clearScreeningPollTimer();
         screeningPollTimerRef.current = setTimeout(() => {
-          void poll(session);
+          void poll(session, attempt + 1);
         }, SCREENING_POLL_INTERVAL_MS);
       } catch (error) {
         console.error("Failed to poll screening status", error);
@@ -480,7 +524,7 @@ export default function JobsWorkspace({
         setProcessingJobId(session.jobId);
         persistActiveScreening(session);
         screeningPollTimerRef.current = setTimeout(() => {
-          void poll(session);
+          void poll(session, attempt + 1);
         }, SCREENING_POLL_INTERVAL_MS * 2);
       }
     },

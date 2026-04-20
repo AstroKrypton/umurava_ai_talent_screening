@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const MODEL_NAME = process.env.GEMINI_MODEL ?? "gemini-3-flash-preview";
+const MODEL_NAME = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
 const FALLBACK_KEYS = ["GEMINI_API_KEY", "GEMINI_AI_API_KEY"] as const;
 
 let cachedClient: GoogleGenerativeAI | null = null;
