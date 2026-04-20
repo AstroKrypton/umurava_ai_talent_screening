@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, PencilLine, Trash2, X } from "lucide-react";
+import { motion, type Variants } from "framer-motion";
+import { Activity, BriefcaseBusiness, CheckCircle2, PencilLine, Sparkles, Trash2, Users, X, type LucideIcon } from "lucide-react";
+import Image from "next/image";
 import { buildJobsQuery } from "@/lib/jobs-query";
 import { AIFairnessGuard } from "@/components/jobs/AIFairnessGuard";
 import { EscaladeLoader } from "@/src/components/ui/EscaladeLoader";
@@ -156,6 +158,22 @@ type ToastMessage = {
   variant?: ToastVariant;
 };
 
+type DashboardStat = {
+  value: number;
+  delta: number;
+};
+
+type DashboardStatsResponse = {
+  success: boolean;
+  data?: {
+    totalJobs: DashboardStat;
+    activeScreenings: DashboardStat;
+    applicants: DashboardStat;
+    shortlisted: DashboardStat;
+  };
+  error?: string;
+};
+
 const initialJobValues: CreateJobValues = {
   title: "",
   location: "",
@@ -168,13 +186,6 @@ const initialJobValues: CreateJobValues = {
   shortlistSize: 10,
   source: "umurava",
   status: "draft",
-};
-
-const statusTone: Record<JobRecord["status"], string> = {
-  draft: "bg-slate-200 text-slate-600",
-  open: "bg-[#E8F3FC] text-[#0B4F8A]",
-  screening: "bg-[#FEF8E1] text-[#7A5C00]",
-  closed: "bg-slate-100 text-slate-500",
 };
 
 const screeningStatusTone: Record<ScreeningRecord["status"], string> = {
@@ -193,6 +204,95 @@ const DEFAULT_SCREENING_BATCH = 5;
 const glassPanelClass = "bg-white/60 backdrop-blur-2xl border border-white/80 shadow-sm rounded-3xl";
 const brandGreen = "#0F8A5F";
 type SidebarSection = "workspace" | "jobs" | "applicants" | "shortlists";
+
+const glassCardClass = "bg-white/40 backdrop-blur-2xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] rounded-[28px]";
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 32 },
+  visible: (index: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: index * 0.08,
+      duration: 0.45,
+      ease: [0.21, 0.74, 0.32, 0.93] as [number, number, number, number],
+    },
+  }),
+  hover: {
+    scale: 1.02,
+    borderColor: "rgba(255,255,255,0.8)",
+    transition: {
+      duration: 0.24,
+      ease: "easeOut",
+    },
+  },
+};
+
+const jobCardVariants: Variants = {
+  hidden: { opacity: 0, y: 40, scale: 0.96 },
+  visible: (index: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      delay: 0.2 + index * 0.06,
+      duration: 0.5,
+      ease: [0.22, 0.68, 0.36, 1] as [number, number, number, number],
+    },
+  }),
+  hover: {
+    scale: 1.02,
+    borderColor: "rgba(255,255,255,0.82)",
+    transition: {
+      duration: 0.25,
+      ease: "easeOut",
+    },
+  },
+};
+
+const jobStatusGradients: Record<JobRecord["status"], string> = {
+  draft: "from-slate-500/80 via-slate-400/70 to-slate-300/60",
+  open: "from-[#4475FF]/90 via-[#2FC1FF]/80 to-[#5EFCE8]/80",
+  screening: "from-[#F7B733]/90 via-[#FC4A1A]/80 to-[#F05A28]/80",
+  closed: "from-[#8E9AAF]/80 via-[#A7AFC9]/70 to-[#CDD4EC]/70",
+};
+
+const jobStatusIcons: Record<JobRecord["status"], LucideIcon> = {
+  draft: PencilLine,
+  open: Sparkles,
+  screening: Activity,
+  closed: BriefcaseBusiness,
+};
+
+function formatDelta(value: number) {
+  if (value === 0) return { label: "No change", tone: "text-slate-500" };
+  const sign = value > 0 ? "+" : "";
+  const tone = value > 0 ? "text-emerald-500" : "text-rose-500";
+  return { label: `${sign}${value} this week`, tone };
+}
+
+function getStatGradient(index: number) {
+  const gradients = [
+    "from-indigo-500 to-cyan-500",
+    "from-rose-400 to-orange-300",
+    "from-emerald-400 to-teal-500",
+    "from-amber-400 to-pink-500",
+  ];
+  return gradients[index % gradients.length];
+}
+
+const statIcons: LucideIcon[] = [
+  BriefcaseBusiness,
+  Activity,
+  Users,
+  Sparkles,
+];
+
+function formatStatValue(value: number) {
+  if (value < 1000) return value.toString();
+  if (value < 10000) return `${(value / 1000).toFixed(1)}k`;
+  return `${Math.round(value / 1000)}k`;
+}
 
 function formatProcessingDuration(value?: number | null) {
   if (value === undefined || value === null) return null;
@@ -272,6 +372,28 @@ export default function JobsWorkspace({
   const [pendingDeleteJob, setPendingDeleteJob] = useState<JobRecord | null>(null);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const isJobDialogOpen = jobDialogMode !== null;
+  const [dashboardStats, setDashboardStats] = useState<DashboardStatsResponse["data"] | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
+  const fetchDashboardStats = useCallback(async () => {
+    try {
+      setStatsError(null);
+      const response = await fetch("/api/dashboard/stats", { cache: "no-store" });
+      const payload = (await response.json()) as DashboardStatsResponse;
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(payload.error || "Unable to load dashboard stats.");
+      }
+      setDashboardStats(payload.data);
+    } catch (error) {
+      console.error("Failed to load dashboard stats", error);
+      setStatsError(error instanceof Error ? error.message : "Unexpected error loading stats.");
+      setDashboardStats(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchDashboardStats();
+  }, [fetchDashboardStats]);
 
   async function handleDeleteJob(job: JobRecord) {
     setDeletingJobId(job.id);
@@ -923,6 +1045,7 @@ export default function JobsWorkspace({
 
       if (response.ok && result.success && result.data) {
         setJobs(result.data);
+        void fetchDashboardStats();
         if (activeJobId) {
           const stillExists = result.data.some((job) => job.id === activeJobId);
           if (!stillExists) {
@@ -1917,6 +2040,63 @@ export default function JobsWorkspace({
                   </button>
                 ))}
               </div>
+              <div className="mt-6 flex flex-wrap gap-4">
+                {dashboardStats
+                  ? (
+                      [
+                        { label: "Total Jobs", stat: dashboardStats.totalJobs },
+                        { label: "Active Screenings", stat: dashboardStats.activeScreenings },
+                        { label: "Applicants", stat: dashboardStats.applicants },
+                        { label: "Shortlisted", stat: dashboardStats.shortlisted },
+                      ] as const
+                    ).map((entry, index) => {
+                      const Icon = statIcons[index];
+                      const delta = formatDelta(entry.stat.delta);
+                      return (
+                        <motion.div
+                          key={entry.label}
+                          className={`${glassCardClass} flex min-w-[240px] flex-1 items-center justify-between gap-4 px-6 py-5`}
+                          variants={cardVariants}
+                          initial="hidden"
+                          animate="visible"
+                          custom={index}
+                          whileHover="hover"
+                          style={{ borderColor: "rgba(255,255,255,0.4)" }}
+                        >
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">{entry.label}</p>
+                            <div className="mt-3 flex items-baseline gap-3">
+                              <span className="text-3xl font-semibold text-slate-900">{formatStatValue(entry.stat.value)}</span>
+                              <span className={`text-xs font-semibold ${delta.tone}`}>{delta.label}</span>
+                            </div>
+                          </div>
+                          <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${getStatGradient(index)} text-white shadow-[0_12px_30px_rgba(37,99,235,0.18)]`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                        </motion.div>
+                      );
+                    })
+                  : statsError ? (
+                      <div className={`${glassCardClass} flex min-w-[240px] flex-1 flex-col gap-3 px-6 py-5 text-sm text-rose-600`}>
+                        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-500">Dashboard offline</p>
+                        <span>{statsError}</span>
+                        <button
+                          className="inline-flex w-fit items-center gap-2 rounded-full border border-white/60 bg-white/70 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600 transition hover:border-white/90 hover:bg-white"
+                          onClick={() => {
+                            void fetchDashboardStats();
+                          }}
+                          type="button"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : (
+                      <div className={`${glassCardClass} flex min-w-[240px] flex-1 flex-col gap-3 px-6 py-5 text-sm text-slate-600`}>
+                        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Loading dashboard</p>
+                        <span className="text-sm">We&apos;re fetching your latest stats…</span>
+                      </div>
+                    )}
+              </div>
             </div>
 
             {!isDetailView ? (
@@ -1935,23 +2115,42 @@ export default function JobsWorkspace({
                   </button>
                 </div>
                 {filteredJobs.length === 0 ? (
-                  <div className="mt-6 rounded-2xl border border-dashed border-white/70 bg-white/75 px-5 py-6 text-sm leading-6 text-slate-600">
-                    No jobs yet for this filter. Create your first role to start building the screening pipeline.
+                  <div className="mt-8 flex flex-col items-center justify-center gap-4 rounded-[32px] border border-dashed border-white/60 bg-white/40 px-6 py-10 text-center text-sm text-slate-600 backdrop-blur-xl">
+                    <div className="relative h-48 w-full max-w-sm">
+                      <Image alt="No recent jobs" src="/illustrations/empty-dashboard-glass.svg" fill priority className="object-contain" sizes="(max-width: 768px) 70vw, 320px" />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-slate-900">No roles in this view yet</h3>
+                      <p className="mx-auto max-w-md text-sm text-slate-600">
+                        Launch a role to keep your pipeline flowing. Once jobs are active, they appear here with real-time stats.
+                      </p>
+                    </div>
+                    <button
+                      className="rounded-full bg-[#0B4F8A] px-6 py-3 text-xs font-semibold uppercase tracking-[0.24em] text-white shadow-md transition hover:bg-[#093d6e]"
+                      onClick={openCreateDialog}
+                      type="button"
+                    >
+                      Create a job
+                    </button>
                   </div>
                 ) : (
                   <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {filteredJobs.map((job) => {
+                    {filteredJobs.map((job, index) => {
                       const isThisJobScreening = processingJobId === job.id;
                       const isAnyJobScreening = processingJobId !== null;
+                      const StatusIcon = jobStatusIcons[job.status];
 
                       return (
-                        <div
+                        <motion.div
                           key={job.id}
-                          className={`group cursor-pointer rounded-3xl border px-5 py-5 transition-all focus-within:ring-2 focus-within:ring-[#0B4F8A] focus:outline-none ${
-                            activeJobId === job.id
-                              ? "border-[#0B4F8A]/40 bg-[#E8F3FC]/70 shadow-lg"
-                              : "border-white/80 bg-white/70 hover:border-[#0B4F8A]/30 hover:shadow-md"
-                          }`}
+                          className={`${glassCardClass} group relative flex min-h-[280px] cursor-pointer flex-col gap-4 border-white/40 p-5 pb-12 focus-within:ring-2 focus-within:ring-[#0B4F8A] focus:outline-none`}
+                          variants={jobCardVariants}
+                          initial="hidden"
+                          animate="visible"
+                          custom={index}
+                          whileHover="hover"
+                          whileFocus="hover"
+                          style={{ borderColor: activeJobId === job.id ? "rgba(11,79,138,0.45)" : "rgba(255,255,255,0.4)" }}
                           onClick={() => openJobDetail(job.id)}
                           onKeyDown={(event) => {
                             if (event.key === "Enter" || event.key === " ") {
@@ -1967,35 +2166,37 @@ export default function JobsWorkspace({
                               <div className="flex items-center gap-2">
                                 <div className="text-base font-semibold text-slate-900">{job.title}</div>
                                 {job.status === "draft" ? (
-                                  <span className="rounded-full border border-[#CBD5F5] bg-[#E8ECFF] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-[#4C57B6]">
+                                  <span className="rounded-full border border-white/60 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.28em] text-slate-500">
                                     Draft
                                   </span>
                                 ) : null}
                               </div>
                               <div className="mt-1 text-sm text-slate-600">{job.location}</div>
                             </div>
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusTone[job.status]}`}>{job.status}</span>
+                            <div className={`relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br ${jobStatusGradients[job.status]} text-white shadow-[0_10px_30px_rgba(15,138,95,0.18)]`}> 
+                              <StatusIcon className="h-5 w-5" aria-hidden />
+                            </div>
                           </div>
-                          <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{job.description}</p>
-                          <div className="mt-3 flex flex-wrap gap-2">
+                          <p className="line-clamp-3 text-sm leading-6 text-slate-600">{job.description}</p>
+                          <div className="flex flex-wrap gap-2">
                             {job.requiredSkills.slice(0, 4).map((skill) => (
-                              <span key={skill} className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm">
+                              <span key={skill} className="rounded-full bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-600 shadow-sm">
                                 {skill}
                               </span>
                             ))}
                           </div>
-                          <div className="mt-4 flex flex-wrap gap-3">
+                          <div className="mt-auto flex flex-wrap gap-3">
                             <button
                               onClick={(event) => {
                                 event.stopPropagation();
                                 void handleRunScreening(job.id);
                               }}
                               disabled={isAnyJobScreening}
-                              className={`flex items-center justify-center gap-2 rounded-full px-5 py-2.5 font-medium transition-all duration-300 ${
+                              className={`flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all duration-300 ${
                                 isThisJobScreening
-                                  ? "border border-slate-200 bg-slate-100 text-slate-800 shadow-inner"
+                                  ? "border border-slate-200 bg-white/80 text-slate-700 shadow-inner"
                                   : isAnyJobScreening
-                                    ? "border border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed"
+                                    ? "border border-slate-100 bg-white/50 text-slate-400 cursor-not-allowed"
                                     : "bg-[#1A8C4E] text-white shadow-md hover:bg-[#157340] hover:shadow-lg"
                               }`}
                               type="button"
@@ -2012,7 +2213,7 @@ export default function JobsWorkspace({
                               )}
                             </button>
                             <button
-                              className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0B4F8A] underline-offset-4 hover:underline"
+                              className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0B4F8A] underline-offset-4 transition hover:underline"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 void refreshScreenings(job.id);
@@ -2028,9 +2229,9 @@ export default function JobsWorkspace({
                                 event.stopPropagation();
                                 openEditDialog(job);
                               }}
-                              className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/70 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-white hover:text-slate-800"
+                              className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-white hover:text-slate-800"
                             >
-                              <PencilLine className="h-3.5 w-3.5" />
+                              <PencilLine className="h-3.5 w-3.5" aria-hidden />
                               Edit
                             </button>
                             <button
@@ -2039,13 +2240,17 @@ export default function JobsWorkspace({
                                 event.stopPropagation();
                                 setPendingDeleteJob(job);
                               }}
-                              className="inline-flex items-center gap-1 rounded-full border border-[#FEE2E2] bg-[#FFF5F5] px-3 py-1.5 text-xs font-semibold text-[#B91C1C] transition hover:bg-[#FEE2E2]"
+                              className="inline-flex items-center gap-1 rounded-full border border-[#FEE2E2] bg-[#FFF5F5]/90 px-3 py-1.5 text-xs font-semibold text-[#B91C1C] transition hover:bg-[#FEE2E2]"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
                               Delete
                             </button>
                           </div>
-                        </div>
+                          <div className="absolute inset-x-5 bottom-5 flex items-center justify-between text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                            <span>{job.employmentType}</span>
+                            <span>Shortlist {job.shortlistSize}</span>
+                          </div>
+                        </motion.div>
                       );
                     })}
                   </div>
@@ -2102,14 +2307,14 @@ export default function JobsWorkspace({
                 </div>
 
                 <div className="mt-6" role="presentation">
-                  <div className="bg-slate-50/50 rounded-[24px] p-1.5 border border-slate-100 flex justify-between" role="tablist">
+                  <div className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-[24px] border border-slate-100 bg-slate-50/50 p-1.5" role="tablist">
                     {tabItems.map((tab) => {
                       const isActive = activeJobTab === tab.key;
 
                       return (
                         <button
                           key={tab.key}
-                          className={`relative flex flex-1 items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold transition ${
+                          className={`relative flex min-w-[138px] flex-shrink-0 items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold transition sm:flex-1 ${
                             isActive
                               ? "text-[#0B4F8A]"
                               : "text-slate-500 hover:text-slate-700"
@@ -2121,7 +2326,7 @@ export default function JobsWorkspace({
                           aria-selected={isActive}
                           type="button"
                         >
-                          <span className="relative z-10">{tab.label}</span>
+                          <span className="relative z-10 whitespace-nowrap">{tab.label}</span>
                           {isActive ? (
                             <span className="absolute inset-x-3 bottom-1 h-1 rounded-full bg-[#0B4F8A]" />
                           ) : null}
