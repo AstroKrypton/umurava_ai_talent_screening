@@ -406,7 +406,7 @@ export default function JobsWorkspace({
   }, []);
 
   const pollScreeningStatus = useCallback(
-    async (session: StoredScreeningSession) => {
+    async function poll(session: StoredScreeningSession): Promise<void> {
       try {
         const response = await fetch(`/api/screen/${session.screeningId}`);
         const payload = (await response.json()) as ScreeningStatusResponse;
@@ -472,7 +472,7 @@ export default function JobsWorkspace({
         persistActiveScreening(session);
         clearScreeningPollTimer();
         screeningPollTimerRef.current = setTimeout(() => {
-          void pollScreeningStatus(session);
+          void poll(session);
         }, SCREENING_POLL_INTERVAL_MS);
       } catch (error) {
         console.error("Failed to poll screening status", error);
@@ -480,7 +480,7 @@ export default function JobsWorkspace({
         setProcessingJobId(session.jobId);
         persistActiveScreening(session);
         screeningPollTimerRef.current = setTimeout(() => {
-          void pollScreeningStatus(session);
+          void poll(session);
         }, SCREENING_POLL_INTERVAL_MS * 2);
       }
     },
@@ -494,7 +494,6 @@ export default function JobsWorkspace({
       setScreeningDetailError,
       setFormError,
       showToast,
-      pollScreeningStatus,
     ],
   );
 
@@ -2309,8 +2308,8 @@ export default function JobsWorkspace({
                                         {processingLabel ? <span>Processing {processingLabel}</span> : null}
                                         {record.aiModelVersion ? <span>Model {record.aiModelVersion}</span> : null}
                                       </div>
-                                      {record.errorMessage ? (
-                                        <div className="mt-2 text-xs text-[#B91C1C]">Error: {record.errorMessage}</div>
+                                      {record.error ? (
+                                        <div className="mt-2 text-xs text-[#B91C1C]">Error: {record.error}</div>
                                       ) : null}
                                     </button>
                                   );

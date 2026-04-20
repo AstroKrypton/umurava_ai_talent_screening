@@ -40,6 +40,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   screening.totalApplicants = applicantPayload.length;
   screening.shortlistSize = jobPayload.shortlistSize;
   screening.results = [];
+  screening.error = undefined;
   await screening.save();
 
   const execution = await executeScreening(jobPayload, applicantPayload);
@@ -49,7 +50,8 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   screening.processingTimeMs = execution.processingTimeMs;
   screening.aiModelVersion = execution.aiModelVersion;
   screening.promptVersion = execution.promptVersion;
-  screening.errorMessage = execution.usedFallback ? execution.errorMessage : undefined;
+  screening.usedFallback = execution.usedFallback;
+  screening.error = execution.usedFallback ? execution.error : undefined;
   await screening.save();
 
   return NextResponse.json({
@@ -63,7 +65,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       aiModelVersion: screening.aiModelVersion,
       promptVersion: screening.promptVersion,
       usedFallback: execution.usedFallback,
-      errorMessage: screening.errorMessage,
+      error: screening.error,
     },
   });
 }
