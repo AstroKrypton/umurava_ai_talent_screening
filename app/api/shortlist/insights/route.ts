@@ -1,12 +1,113 @@
 import { NextResponse } from "next/server";
-import { getGeminiModelByName, isGeminiConfigured } from "@/src/lib/geminiClient";
+import { getGeminiModelByName, getGeminiModelName, isGeminiConfigured } from "@/src/lib/geminiClient";
 import type { InclusionInsightsReport } from "@/src/types/insights";
 
 const MODEL_NAME = "gemini-3-flash";
+const MAX_RETRIES = 2;
+const BASE_RETRY_DELAY_MS = 450;
+const RETRYABLE_STATUS_CODES = new Set([429, 500, 503]);
+const MODEL_FALLBACK_CHAIN = dedupeModels([
+  MODEL_NAME,
+  getGeminiModelName(),
+  "gemini-3-flash-preview",
+  "gemini-1.5-flash-latest",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro-latest",
+  "gemini-1.5-pro",
+]);
 
 function clampPercentage(value: unknown, fallback: number) {
   if (typeof value !== "number" || Number.isNaN(value)) return fallback;
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function dedupeModels(modelNames: string[]) {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const name of modelNames) {
+    if (!name) continue;
+    const trimmed = name.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    ordered.push(trimmed);
+  }
+  return ordered;
+}
+
+function getErrorStatus(error: unknown): number | null {
+  if (error && typeof error === "object") {
+    const status = (error as { status?: number }).status;
+    if (typeof status === "number") return status;
+
+    const code = (error as { code?: number | string }).code;
+    if (typeof code === "number") return code;
+    if (typeof code === "string") {
+      const parsed = Number.parseInt(code, 10);
+      if (!Number.isNaN(parsed)) return parsed;
+    }
+
+    const message = (error as Error).message;
+    if (typeof message === "string") {
+      if (message.includes("429")) return 429;
+      if (message.includes("503")) return 503;
+      if (message.includes("500")) return 500;
+    }
+  }
+  return null;
+}
+
+async function wait(ms: number) {
+  await new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function extractJsonBlock(raw: string) {
+  const trimmed = raw.replace(/```json|```/gi, "").trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const start = trimmed.indexOf("{");
+    const end = trimmed.lastIndexOf("}");
+    if (start !== -1 && end !== -1 && end > start) {
+      const candidate = trimmed.slice(start, end + 1);
+      return JSON.parse(candidate);
+    }
+    throw new Error("Gemini returned a non-JSON response");
+  }
+}
+
+async function callGeminiWithFallback(prompt: string) {
+  let lastError: unknown = null;
+
+  for (const modelName of MODEL_FALLBACK_CHAIN) {
+    const model = getGeminiModelByName(modelName);
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt += 1) {
+      try {
+        const result = await model.generateContent(prompt);
+        const rawText = result.response?.text();
+        if (!rawText || rawText.trim().length === 0) {
+          throw new Error("Gemini API returned an empty response");
+        }
+        return { rawText, modelName };
+      } catch (error) {
+        lastError = error;
+        const status = getErrorStatus(error);
+        const isRetryable = status !== null && RETRYABLE_STATUS_CODES.has(status);
+        const isLastAttempt = attempt === MAX_RETRIES - 1;
+
+        if (!isRetryable || isLastAttempt) {
+          break;
+        }
+
+        const delay = BASE_RETRY_DELAY_MS * 2 ** attempt;
+        await wait(delay);
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Gemini models are unavailable");
 }
 
 export async function POST(request: Request) {
@@ -39,16 +140,8 @@ export async function POST(request: Request) {
   const prompt = `Analyze the following candidate shortlist. Evaluate the "Diversity of Experience" and "Educational Backgrounds". Provide an "Inclusion Score" (0-100) and a brief justification (max 50 words) confirming that the ranking is based on technical merit and project evidence, ensuring no bias toward specific institutions or labels.\n\nReturn JSON with the following shape:\n{\n  "inclusionScore": number,\n  "skillDiversityIndex": number,\n  "educationNeutrality": string,\n  "inclusionSummary": string,\n  "justification": string\n}\n\nSHORTLIST: ${shortlistJson}`;
 
   try {
-    const model = getGeminiModelByName(MODEL_NAME);
-    const result = await model.generateContent(prompt);
-    const text = result.response?.text();
-
-    if (!text) {
-      throw new Error("Gemini returned an empty response.");
-    }
-
-    const sanitized = text.replace(/```json|```/gi, "").trim();
-    const parsed = JSON.parse(sanitized) as Partial<{ [key: string]: unknown }>;
+    const { rawText, modelName } = await callGeminiWithFallback(prompt);
+    const parsed = extractJsonBlock(rawText) as Partial<Record<string, unknown>>;
 
     const report: InclusionInsightsReport = {
       inclusionScore: clampPercentage(parsed.inclusionScore, 50),
