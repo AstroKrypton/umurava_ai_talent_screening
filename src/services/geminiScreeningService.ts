@@ -82,12 +82,10 @@ const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 600;
 const RETRYABLE_STATUS_CODES = new Set([429, 503]);
 const MODEL_FALLBACK_CHAIN = [
-  getGeminiModelName(),
+  getGeminiModelName() || "gemini-2.5-flash",
   "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.5-pro",
   "gemini-3-flash-preview",
-  "gemini-3.1-pro-preview",
+  "gemini-2.5-flash-lite",
   "gemini-2.5-flash-001",
 ];
 
