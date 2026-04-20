@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PencilLine, Trash2, X } from "lucide-react";
+import { CheckCircle2, PencilLine, Trash2, X } from "lucide-react";
 import { buildJobsQuery } from "@/lib/jobs-query";
 import { AIFairnessGuard } from "@/components/jobs/AIFairnessGuard";
 import { EscaladeLoader } from "@/src/components/ui/EscaladeLoader";
@@ -256,6 +256,7 @@ export default function JobsWorkspace({
   const [csvSummary, setCsvSummary] = useState<CsvImportSummary | null>(null);
   const [csvErrors, setCsvErrors] = useState<string>("");
   const [csvWarnings, setCsvWarnings] = useState<Array<{ row: number; message: string }>>([]);
+  const [csvWarningsExpanded, setCsvWarningsExpanded] = useState(false);
   const [csvIsUploading, setCsvIsUploading] = useState(false);
   const [csvMapping, setCsvMapping] = useState("{}");
   const [csvSource, setCsvSource] = useState<"umurava" | "external">("external");
@@ -797,6 +798,7 @@ export default function JobsWorkspace({
 
     setCsvErrors("");
     setCsvWarnings([]);
+    setCsvWarningsExpanded(false);
     setCsvSummary(null);
     setCsvIsUploading(true);
 
@@ -823,6 +825,7 @@ export default function JobsWorkspace({
       if (!response.ok || !payload.success || !payload.data) {
         setCsvErrors(payload.error || "Unable to import CSV. Check mapping or file format.");
         setCsvWarnings(payload.warnings ?? []);
+        setCsvWarningsExpanded(false);
         showToast({
           title: payload.error || "CSV import failed",
           description: payload.warnings && payload.warnings.length > 0 ? `First warning: ${payload.warnings[0].message}` : undefined,
@@ -833,6 +836,7 @@ export default function JobsWorkspace({
 
       setCsvSummary(payload.data);
       setCsvWarnings(payload.data.warnings ?? []);
+      setCsvWarningsExpanded(false);
       setCsvFile(null);
       void refreshJobs();
       showToast({
@@ -2223,26 +2227,47 @@ export default function JobsWorkspace({
                             </div>
                           ) : null}
                           {csvWarnings.length > 0 ? (
-                            <div className="mt-4 space-y-2 rounded-2xl border border-[#F5C518]/30 bg-[#FEF3C7] px-4 py-3 text-xs text-[#B45309]">
-                              <div className="font-semibold uppercase tracking-[0.2em] text-[10px]">Warnings ({csvWarnings.length})</div>
-                              <ul className="space-y-1">
-                                {csvWarnings.slice(0, 3).map((warning) => (
+                            <div className="mt-4 overflow-hidden rounded-2xl border border-amber-200/50 bg-amber-50/50 p-4 text-xs text-amber-900 backdrop-blur-md">
+                              <div className="flex items-center justify-between">
+                                <div className="font-semibold uppercase tracking-[0.2em] text-[10px] text-amber-700">
+                                  Warnings ({csvWarnings.length})
+                                </div>
+                                {csvWarnings.length > 2 ? (
+                                  <button
+                                    className="text-[11px] font-semibold text-amber-700/80 transition hover:text-amber-800"
+                                    onClick={() => setCsvWarningsExpanded((value) => !value)}
+                                    type="button"
+                                  >
+                                    {csvWarningsExpanded
+                                      ? "Show fewer details"
+                                      : `+${csvWarnings.length - 2} more details`}
+                                  </button>
+                                ) : null}
+                              </div>
+                              <ul className="mt-2 space-y-1">
+                                {(csvWarningsExpanded ? csvWarnings : csvWarnings.slice(0, 2)).map((warning) => (
                                   <li key={`${warning.row}-${warning.message}`}>
-                                    Row {warning.row}: {warning.message}
+                                    {warning.row > 0 ? `Row ${warning.row}: ` : ""}
+                                    {warning.message}
                                   </li>
                                 ))}
                               </ul>
-                              {csvWarnings.length > 3 ? (
-                                <div className="text-[10px] text-[#B45309]/80">+{csvWarnings.length - 3} more warnings</div>
-                              ) : null}
                             </div>
                           ) : null}
                           {csvSummary ? (
-                            <div className="mt-4 rounded-2xl border border-[#0F8A5F]/30 bg-[#D1FAE5] px-4 py-3 text-xs text-[#065F46]">
-                              <div className="font-semibold uppercase tracking-[0.2em] text-[10px]">Last import</div>
-                              <div className="mt-2 grid gap-1">
-                                <div>Processed: <span className="font-semibold">{csvSummary.totalProcessed}</span></div>
-                                <div>Inserted: <span className="font-semibold">{csvSummary.inserted}</span> · Updated: <span className="font-semibold">{csvSummary.updated}</span></div>
+                            <div className="mt-4 rounded-2xl border border-emerald-200/50 bg-emerald-50/50 px-4 py-3 text-xs text-emerald-900">
+                              <div className="font-semibold uppercase tracking-[0.2em] text-[10px] text-emerald-700">Last import</div>
+                              <div className="mt-2 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 aria-hidden className="h-4 w-4 text-emerald-500" />
+                                  <span className="font-semibold text-emerald-800">Import succeeded</span>
+                                </div>
+                                <div>
+                                  Processed: <span className="font-semibold">{csvSummary.totalProcessed}</span>
+                                </div>
+                                <div>
+                                  Inserted: <span className="font-semibold">{csvSummary.inserted}</span> · Updated: <span className="font-semibold">{Math.max(csvSummary.updated, 0)}</span>
+                                </div>
                               </div>
                             </div>
                           ) : null}

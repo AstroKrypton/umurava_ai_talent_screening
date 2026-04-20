@@ -13,6 +13,9 @@ export const metadata: Metadata = {
   title: "Umurava AI — Intelligent Talent Screening",
   description:
     "Umurava AI uses advanced artificial intelligence to source, screen, and analyze talent — delivering precise, unbiased candidate matching at scale.",
+  icons: {
+    icon: "/icon.ico",
+  },
 };
 
 export default function RootLayout({

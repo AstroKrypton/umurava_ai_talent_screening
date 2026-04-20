@@ -93,11 +93,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       { ordered: false },
     );
 
+    const inserted = result.upsertedCount ?? 0;
+    const modified = result.modifiedCount ?? 0;
+    const matched = result.matchedCount ?? 0;
+    const rawUpdated = modified + matched - inserted;
+    const updated = Math.max(rawUpdated, 0);
+
     return NextResponse.json({
       success: true,
       data: {
-        inserted: result.upsertedCount ?? 0,
-        updated: (result.modifiedCount ?? 0) + (result.matchedCount ?? 0) - (result.upsertedCount ?? 0),
+        inserted,
+        updated,
         totalProcessed: documents.length,
         warnings,
         previewApplicant,

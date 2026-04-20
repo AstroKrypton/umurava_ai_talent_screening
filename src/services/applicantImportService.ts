@@ -433,9 +433,9 @@ function normaliseRow(
 
   let availability = parseAvailability(resolveField(row, "availability", options.mapping));
   if (!availability) {
-    warnings.push({ row: index, message: "Availability missing or invalid. Using default availability." });
+    warnings.push({ row: index, message: "Availability missing or invalid. Using default availability (Available Now)." });
     availability = {
-      status: "Open to Opportunities",
+      status: "Available",
       type: "Full-time",
     } satisfies Availability;
   }
@@ -525,7 +525,18 @@ export function parseApplicantsCsv(csv: string | Buffer, options: CsvImportOptio
     }
   });
 
-  return { applicants, warnings };
+  const availabilityNotice = "Availability missing or invalid. Using default availability (Available Now).";
+  const availabilityWarnings = warnings.filter((warning) => warning.message === availabilityNotice);
+  const reducedWarnings = warnings.filter((warning) => warning.message !== availabilityNotice);
+
+  if (availabilityWarnings.length > 0) {
+    reducedWarnings.push({
+      row: 0,
+      message: `Notice: ${availabilityWarnings.length} rows were missing availability; used default (Available Now).`,
+    });
+  }
+
+  return { applicants, warnings: reducedWarnings };
 }
 
 export function buildApplicantDocuments(jobId: string, applicants: ParsedApplicant[]) {
