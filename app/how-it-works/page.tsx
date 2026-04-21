@@ -17,7 +17,7 @@ const steps = [
   {
     icon: Activity,
     title: "The Escalade Screening",
-    description: "Watch the Escalade Loader in action as Gemini 3 Flash performs comprehensive technical analysis on every profile.",
+    description: "Watch the Escalade Loader in action as Gemini  performs comprehensive technical analysis on every profile.",
   },
   {
     icon: Trophy,
