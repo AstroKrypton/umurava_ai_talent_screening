@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { motion, type Variants } from "framer-motion";
 import { Activity, BriefcaseBusiness, CheckCircle2, PencilLine, Sparkles, Trash2, Users, X, type LucideIcon } from "lucide-react";
 import Image from "next/image";
@@ -264,7 +264,7 @@ const jobStatusIcons: Record<JobRecord["status"], LucideIcon> = {
   closed: BriefcaseBusiness,
 };
 
-const mobileNavIcons: Record<SidebarSection, JSX.Element> = {
+const mobileNavIcons: Record<SidebarSection, ReactElement> = {
   workspace: (
     <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
       <path
