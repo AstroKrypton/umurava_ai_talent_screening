@@ -1579,9 +1579,9 @@ export default function JobsWorkspace({
           onClick={handleCloseResultModal}
           role="presentation"
         >
-          <div className="flex min-h-full items-start justify-center p-4 sm:p-6 lg:p-8">
+          <div className="flex min-h-full items-start justify-center p-2 pt-4 md:p-4 md:pt-8">
             <div
-              className="relative w-full max-w-3xl bg-white rounded-2xl shadow-xl my-8"
+              className="relative w-full max-w-3xl bg-white rounded-2xl shadow-xl my-2 md:my-8"
               role="dialog"
               aria-modal="true"
               onClick={(event) => event.stopPropagation()}
@@ -1595,33 +1595,31 @@ export default function JobsWorkspace({
                 <X className="h-4 w-4" />
               </button>
 
-              <div className="p-6 sm:p-8">
+              <div className="p-4 md:p-8">
                 <div className="mb-6">
                   <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Candidate spotlight</div>
                   <h3 className="mt-2 text-2xl font-semibold text-slate-900">{selectedResult.applicantName}</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 mb-8">
-                  <div className={`${glassPanelClass} h-auto p-6`}>
-                    <div className="flex items-center justify-center">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 mb-6 md:mb-8">
+                  <div className={`${glassPanelClass} h-auto p-6 flex items-center justify-center md:block`}>
+                    <div className="relative w-44 h-44 md:w-64 md:h-64 mx-auto">
                       <OverallScoreGauge score={selectedResult.overallScore} />
                     </div>
                   </div>
-                  <div className={`${glassPanelClass} h-auto p-6`}>
+                  <div className={`${glassPanelClass} h-auto w-full p-6`}>
                     <div className="space-y-4">
                       {scoreBars.map((bar) => (
                         <div key={bar.label} className="flex items-center gap-4">
-                          <span className="min-w-[8rem] shrink-0 text-sm font-semibold text-slate-900">{bar.label}</span>
-                          <div className="relative flex-1">
-                            <div className="relative h-2 overflow-hidden rounded-full bg-slate-200/40">
-                              <div
-                                className="absolute inset-y-0 left-0 h-full rounded-full bg-[#1A8C4E] shadow-[0_0_0_1px_rgba(26,140,78,0.25)] transition-[width] duration-300"
-                                style={{ width: `${bar.value}%` }}
-                              />
-                              <div className="absolute inset-0 rounded-full border border-white/30" aria-hidden="true" />
-                            </div>
+                          <span className="w-16 shrink-0 text-xs text-slate-500 md:w-24 md:min-w-[8rem] md:text-sm md:font-semibold md:text-slate-900">{bar.label}</span>
+                          <div className="relative flex-1 min-w-0 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                            <div
+                              className="absolute inset-y-0 left-0 h-full rounded-full bg-[#1A8C4E] shadow-[0_0_0_1px_rgba(26,140,78,0.25)] transition-[width] duration-300"
+                              style={{ width: `${bar.value}%` }}
+                            />
+                            <div className="absolute inset-0 rounded-full border border-white/30" aria-hidden="true" />
                           </div>
-                          <span className="w-12 shrink-0 text-right text-sm font-semibold text-slate-900">{`${Math.round(bar.value)}%`}</span>
+                          <span className="w-8 shrink-0 text-right text-xs font-semibold text-slate-700 md:w-10 md:text-sm md:text-slate-900">{`${Math.round(bar.value)}%`}</span>
                         </div>
                       ))}
                     </div>
@@ -1629,7 +1627,7 @@ export default function JobsWorkspace({
                 </div>
 
                 <div className="space-y-8">
-                  <div className="grid gap-6 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                     <div className={`${glassPanelClass} p-5`}>
                       <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500">Strengths</div>
                       <ul className="mt-3 space-y-2 text-sm text-slate-700">
