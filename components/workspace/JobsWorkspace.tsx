@@ -264,6 +264,45 @@ const jobStatusIcons: Record<JobRecord["status"], LucideIcon> = {
   closed: BriefcaseBusiness,
 };
 
+const mobileNavIcons: Record<SidebarSection, JSX.Element> = {
+  workspace: (
+    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"
+      />
+    </svg>
+  ),
+  jobs: (
+    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20.25 14.15v4.073a2.25 2.25 0 01-2.25 2.25h-12a2.25 2.25 0 01-2.25-2.25v-4.073M15.75 9.75V6a3.75 3.75 0 00-7.5 0v3.75M3.75 14.25h16.5"
+      />
+    </svg>
+  ),
+  applicants: (
+    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+      />
+    </svg>
+  ),
+  shortlists: (
+    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.499z"
+      />
+    </svg>
+  ),
+};
+
 function formatDelta(value: number) {
   if (value === 0) return { label: "No change", tone: "text-slate-500" };
   const sign = value > 0 ? "+" : "";
@@ -1969,7 +2008,7 @@ export default function JobsWorkspace({
           </div>
         </aside>
         <nav
-          className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-4 border-t border-white/60 bg-white/90 px-4 py-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600 backdrop-blur-xl shadow-[0_-12px_40px_rgba(15,138,95,0.18)] lg:hidden"
+          className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-stretch border-t border-slate-200 bg-white pb-safe lg:hidden"
           aria-label="Workspace quick navigation"
         >
           {sidebarItems.map((item) => {
@@ -1980,9 +2019,12 @@ export default function JobsWorkspace({
                 type="button"
                 onClick={() => handleSidebarNavigation(item.key)}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex-1 rounded-full px-2 py-2 transition ${isActive ? "bg-[#0F8A5F] text-white shadow-md" : "border border-white/70 bg-white/60"}`}
+                className={`flex flex-1 min-w-0 flex-col items-center justify-center gap-1 py-2 transition ${
+                  isActive ? "text-[#0B4F8A]" : "text-slate-400"
+                }`}
               >
-                {item.label}
+                {mobileNavIcons[item.key]}
+                <span className="w-full truncate text-[10px] font-medium leading-tight text-center">{item.label}</span>
               </button>
             );
           })}
@@ -2307,17 +2349,17 @@ export default function JobsWorkspace({
                 </div>
 
                 <div className="mt-6" role="presentation">
-                  <div className="no-scrollbar flex snap-x snap-mandatory overflow-x-auto rounded-[24px] border border-slate-100 bg-slate-50/50 p-1.5" role="tablist">
+                  <div className="flex overflow-x-auto border-b border-slate-200 -mx-4 px-4 scrollbar-hide" role="tablist">
                     {tabItems.map((tab) => {
                       const isActive = activeJobTab === tab.key;
 
                       return (
                         <button
                           key={tab.key}
-                          className={`relative flex min-w-[138px] flex-shrink-0 items-center justify-center rounded-[18px] px-4 py-3 text-sm font-semibold transition sm:flex-1 ${
+                          className={`flex-shrink-0 whitespace-nowrap px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                             isActive
-                              ? "text-[#0B4F8A]"
-                              : "text-slate-500 hover:text-slate-700"
+                              ? "border-[#0B4F8A] text-[#0B4F8A]"
+                              : "border-transparent text-slate-500 hover:text-slate-700"
                           }`}
                           onClick={() => {
                             openJobDetail(activeJob.id, tab.key);
@@ -2326,10 +2368,7 @@ export default function JobsWorkspace({
                           aria-selected={isActive}
                           type="button"
                         >
-                          <span className="relative z-10 whitespace-nowrap">{tab.label}</span>
-                          {isActive ? (
-                            <span className="absolute inset-x-3 bottom-1 h-1 rounded-full bg-[#0B4F8A]" />
-                          ) : null}
+                          {tab.label}
                         </button>
                       );
                     })}

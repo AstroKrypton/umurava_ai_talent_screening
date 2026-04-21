@@ -250,6 +250,15 @@ body {
 
 /* ── Utility Classes ── */
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .pipeline-panel {
