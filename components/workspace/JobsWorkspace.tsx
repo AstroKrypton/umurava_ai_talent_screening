@@ -408,6 +408,8 @@ export default function JobsWorkspace({
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const screeningPollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const screeningPollAttemptsRef = useRef(0);
+  const shortlistTopRef = useRef<HTMLDivElement | null>(null);
+  const lastScrolledShortlistIdRef = useRef<string | null>(null);
   const [pendingDeleteJob, setPendingDeleteJob] = useState<JobRecord | null>(null);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const isJobDialogOpen = jobDialogMode !== null;
@@ -1476,6 +1478,30 @@ export default function JobsWorkspace({
       clearInsightsState();
     }
   }, [clearInsightsState, insightsShortlistId, selectedDetail]);
+
+  useEffect(() => {
+    if (activeJobTab !== "shortlist") {
+      lastScrolledShortlistIdRef.current = null;
+      return;
+    }
+
+    if (!selectedDetail || isLoadingScreeningDetail || selectedDetail.results.length === 0) {
+      return;
+    }
+
+    if (lastScrolledShortlistIdRef.current === selectedDetail.id) {
+      return;
+    }
+
+    const target = shortlistTopRef.current;
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    lastScrolledShortlistIdRef.current = selectedDetail.id;
+  }, [activeJobTab, isLoadingScreeningDetail, selectedDetail]);
 
   const fetchInclusionInsights = useCallback(async (detail: ScreeningDetailRecord) => {
     setInsightsLoading(true);
@@ -2683,9 +2709,10 @@ export default function JobsWorkspace({
                               <p className="text-xs text-slate-600">Preparing shortlist preview…</p>
                             ) : selectedDetail ? (
                               selectedDetail.results.length > 0 ? (
-                                selectedDetail.results.map((result) => (
+                                selectedDetail.results.map((result, resultIndex) => (
                                   <div
                                     key={result.applicantId}
+                                    ref={resultIndex === 0 ? shortlistTopRef : undefined}
                                     className={`${glassPanelClass} px-5 py-4 transition-all hover:-translate-y-1 hover:shadow-md`}
                                   >
                                     <div className="flex flex-wrap items-start justify-between gap-3">
