@@ -41,6 +41,243 @@ export interface CsvImportOptions {
   defaultSource: TalentProfile["source"];
 }
 
+function inferFieldOfStudyFromHeadline(headline?: string): string {
+  if (!headline) return "";
+  const segments = headline.split(/[|–\-]/).map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length >= 2) {
+    return segments[segments.length - 1];
+  }
+  const words = headline.trim().split(/\s+/);
+  return words.length > 2 ? words.slice(1).join(" ") : headline.trim();
+}
+
+function extractSkillNames(skillsStr?: string): string[] {
+  if (!skillsStr) return [];
+  return skillsStr
+    .split(";")
+    .map((entry) => entry.trim())
+    .map((entry) => {
+      const match = entry.match(/^(.+?)\s*\(/);
+      return match ? match[1].trim() : entry;
+    })
+    .filter(Boolean);
+}
+
+function normaliseFlatSkillLevel(level?: string): Skill["level"] {
+  if (!level) return "Intermediate";
+  switch (level.trim().toLowerCase()) {
+    case "beginner":
+      return "Beginner";
+    case "intermediate":
+      return "Intermediate";
+    case "advanced":
+      return "Advanced";
+    case "expert":
+      return "Expert";
+    default:
+      return "Intermediate";
+  }
+}
+
+function parseFlatSkills(raw?: string): Skill[] {
+  if (!raw) return [];
+  return raw
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const match = entry.match(/^(.+?)\s*\(([^)]+)\)$/);
+      if (match) {
+        return {
+          name: match[1].trim(),
+          level: normaliseFlatSkillLevel(match[2]),
+          yearsOfExperience: 0,
+        } satisfies Skill;
+      }
+      return {
+        name: entry,
+        level: "Intermediate",
+        yearsOfExperience: 0,
+      } satisfies Skill;
+    });
+}
+
+function parseFlatCertifications(raw?: string): Certification[] {
+  if (!raw) return [];
+  return raw
+    .split(/[;,]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((name) => ({ name, issuer: "", issueDate: "" } satisfies Certification));
+}
+
+function parseFlatLanguages(raw?: string): Language[] {
+  if (!raw) return [];
+  return raw
+    .split(";")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((name) => ({ name, proficiency: "Fluent" as const } satisfies Language));
+}
+
+function buildFlatExperience(row: Record<string, unknown>): Experience[] {
+  const summary = typeof row.experience_summary === "string" ? row.experience_summary.trim() : "";
+  if (!summary) return [];
+
+  const yearsMatch = summary.match(/(\d+)\s*year/i);
+  const totalYears = yearsMatch ? Number.parseInt(yearsMatch[1], 10) : 0;
+  const skillsStr = typeof row.skills === "string" ? row.skills : "";
+  const technologies = extractSkillNames(skillsStr);
+  const currentYear = new Date().getFullYear();
+  const startYear = totalYears > 0 ? currentYear - totalYears : undefined;
+
+  return [
+    {
+      company: "Previous Employment",
+      role: typeof row.headline === "string" && row.headline.trim().length > 0 ? row.headline.trim() : "Developer",
+      startDate: startYear ? `${startYear}-01` : "",
+      endDate: "Present",
+      description: summary,
+      technologies,
+      isCurrent: true,
+    } satisfies Experience,
+  ];
+}
+
+function buildFlatProjects(row: Record<string, unknown>): Project[] {
+  const raw = typeof row.projects === "string" ? row.projects : "";
+  if (!raw) return [];
+  const technologies = extractSkillNames(typeof row.skills === "string" ? row.skills : "");
+  return raw
+    .split(";")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((name) => ({
+      name,
+      description: "",
+      technologies,
+      role: "Developer",
+      link: "",
+      startDate: "",
+      endDate: "",
+    } satisfies Project));
+}
+
+function buildFlatEducation(row: Record<string, unknown>): Education[] {
+  const institution = typeof row.education_institution === "string" ? row.education_institution.trim() : "";
+  const degree = typeof row.education_degree === "string" ? row.education_degree.trim() : "";
+  if (!institution || !degree) {
+    return [];
+  }
+
+  return [
+    {
+      institution,
+      degree,
+      fieldOfStudy: inferFieldOfStudyFromHeadline(typeof row.headline === "string" ? row.headline : undefined),
+      startYear: 0,
+      endYear: undefined,
+    } satisfies Education,
+  ];
+}
+
+function buildFlatAvailability(row: Record<string, unknown>): Availability | undefined {
+  const statusRaw = typeof row.availability_status === "string" ? row.availability_status.trim() : "";
+  const typeRaw = typeof row.availability_type === "string" ? row.availability_type.trim() : "";
+  if (!statusRaw || !typeRaw) {
+    return undefined;
+  }
+  const status = normaliseAvailabilityStatus(statusRaw);
+  const type = normaliseAvailabilityType(typeRaw);
+  return {
+    status,
+    type,
+    startDate: undefined,
+  } satisfies Availability;
+}
+
+function parseFlatRow(
+  row: Record<string, unknown>,
+  index: number,
+  options: CsvImportOptions,
+): { applicant?: ParsedApplicant; warnings: CsvImportWarning[] } {
+  const warnings: CsvImportWarning[] = [];
+
+  const requiredFields = ["firstName", "lastName", "email"] as const;
+  const resolved: Record<(typeof requiredFields)[number], string> = {
+    firstName: "",
+    lastName: "",
+    email: "",
+  };
+
+  for (const field of requiredFields) {
+    const raw = row[field];
+    if (typeof raw !== "string" || raw.trim().length === 0) {
+      warnings.push({ row: index, message: `Missing required field '${field}'.` });
+      return { warnings };
+    }
+    resolved[field] = raw.trim();
+  }
+
+  let availability = buildFlatAvailability(row);
+  if (!availability) {
+    warnings.push({ row: index, message: "Availability missing or invalid. Using default availability (Available Now)." });
+    availability = {
+      status: "Available",
+      type: "Full-time",
+    } satisfies Availability;
+  }
+
+  const headline = typeof row.headline === "string" && row.headline.trim().length > 0 ? row.headline.trim() : `${resolved.firstName} ${resolved.lastName}`;
+  const location = typeof row.location === "string" && row.location.trim().length > 0 ? row.location.trim() : "Unknown";
+
+  const skills = parseFlatSkills(typeof row.skills === "string" ? row.skills : undefined);
+  const experience = buildFlatExperience(row);
+  const education = buildFlatEducation(row);
+  const projects = buildFlatProjects(row);
+  const certifications = parseFlatCertifications(typeof row.certifications === "string" ? row.certifications : undefined);
+  const languages = parseFlatLanguages(typeof row.languages === "string" ? row.languages : undefined);
+
+  if (skills.length === 0) {
+    warnings.push({ row: index, message: "At least one skill is required." });
+  }
+
+  if (experience.length === 0) {
+    warnings.push({ row: index, message: "At least one experience entry is required." });
+  }
+
+  if (education.length === 0) {
+    warnings.push({ row: index, message: "At least one education entry is required." });
+  }
+
+  if (projects.length === 0) {
+    warnings.push({ row: index, message: "At least one project entry is required." });
+  }
+
+  const applicant: ParsedApplicant = {
+    firstName: resolved.firstName,
+    lastName: resolved.lastName,
+    email: resolved.email.toLowerCase(),
+    headline,
+    location,
+    bio: typeof row.experience_summary === "string" ? row.experience_summary.trim() : undefined,
+    skills,
+    experience,
+    education,
+    projects,
+    availability,
+    languages,
+    certifications,
+    socialLinks: undefined,
+    resumeUrl: undefined,
+    rawResumeText: undefined,
+    source: options.defaultSource,
+    umuravaProfileId: undefined,
+  };
+
+  return { applicant, warnings };
+}
+
 export interface CsvImportWarning {
   row: number;
   message: string;
@@ -517,8 +754,11 @@ export function parseApplicantsCsv(csv: string | Buffer, options: CsvImportOptio
   const applicants: ParsedApplicant[] = [];
   const warnings: CsvImportWarning[] = [];
 
+  const headers = Object.keys(rows[0] ?? {});
+  const isFlatFormat = headers.includes("education_institution");
+
   rows.forEach((row, index) => {
-    const result = normaliseRow(row, index + 2, options);
+    const result = isFlatFormat ? parseFlatRow(row, index + 2, options) : normaliseRow(row, index + 2, options);
     warnings.push(...result.warnings);
     if (result.applicant) {
       applicants.push(result.applicant);
