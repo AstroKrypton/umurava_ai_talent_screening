@@ -456,6 +456,7 @@ export default function JobsWorkspace({
         setSelectedScreening(null);
         setSelectedResult(null);
       }
+      void fetchDashboardStats();
       showToast({
         title: "Role archived",
         description: `${job.title} is now closed.`,
@@ -1238,6 +1239,8 @@ export default function JobsWorkspace({
               : "Your new role is live for applicant intake.",
         variant: "success",
       });
+
+      void fetchDashboardStats();
 
       setValues(initialJobValues);
       setJobDialogMode(null);
