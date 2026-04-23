@@ -2248,11 +2248,16 @@ export default function JobsWorkspace({
                           </div>
                           <p className="line-clamp-3 text-sm leading-6 text-slate-600">{job.description}</p>
                           <div className="flex flex-wrap gap-2">
-                            {job.requiredSkills.slice(0, 4).map((skill) => (
+                            {job.requiredSkills.slice(0, 5).map((skill) => (
                               <span key={skill} className="rounded-full bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-600 shadow-sm">
                                 {skill}
                               </span>
                             ))}
+                            {job.requiredSkills.length > 5 && (
+                              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-slate-400 shadow-sm">
+                                +{job.requiredSkills.length - 5} more
+                              </span>
+                            )}
                           </div>
                           <div className="mt-auto flex flex-wrap gap-3">
                             <button
