@@ -761,10 +761,12 @@ export function computeScreeningResults(
     };
   });
 
-  scoredApplicants.sort((a, b) => b.overallScore - a.overallScore);
-
   const shortlistSize = job.shortlistSize || 10;
-  const results: ScreeningResult[] = scoredApplicants.map((item, index) => ({
+  const topApplicants = scoredApplicants
+    .sort((a, b) => b.overallScore - a.overallScore)
+    .slice(0, shortlistSize);
+
+  const results: ScreeningResult[] = topApplicants.map((item, index) => ({
     rank: index + 1,
     applicantId: item.applicantId,
     applicantName: item.applicantName,
@@ -776,7 +778,7 @@ export function computeScreeningResults(
     strengths: item.strengths,
     gaps: item.gaps,
     recommendation: item.recommendation,
-    isShortlisted: index < shortlistSize,
+    isShortlisted: true,
     insights: item.insights,
   }));
 

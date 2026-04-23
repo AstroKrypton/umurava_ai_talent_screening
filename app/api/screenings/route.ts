@@ -60,6 +60,8 @@ export async function POST(request: Request) {
     const execution = await executeScreening(jobPayload, applicantPayload);
 
     screening.status = "completed";
+    screening.totalApplicants = applicantPayload.length;
+    screening.shortlistSize = jobPayload.shortlistSize;
     screening.results = execution.results;
     screening.aiModelVersion = execution.aiModelVersion;
     screening.promptVersion = execution.promptVersion;

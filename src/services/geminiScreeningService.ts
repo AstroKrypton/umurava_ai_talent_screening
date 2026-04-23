@@ -50,6 +50,10 @@ Evaluate the following candidates for the job below.
 Return ONLY valid JSON. No markdown. No explanation outside the JSON.
 Return candidateIndex exactly as provided (0, 1, 2, ...). Do not return applicantId. Do not generate any IDs.
 
+You must return ONLY the top ${job.shortlistSize} candidates ranked by overallScore descending.
+Do not return more than ${job.shortlistSize} results.
+If there are ${applicants.length} candidates, evaluate all of them but only return the best ${job.shortlistSize}.
+
 JOB:
 ${jobSummary}
 
@@ -116,7 +120,16 @@ function toScreeningResults(
     }
   });
 
-  return validResults;
+  const finalResults = validResults
+    .sort((a, b) => b.overallScore - a.overallScore)
+    .slice(0, shortlistSize)
+    .map((result, index) => ({
+      ...result,
+      rank: index + 1,
+      isShortlisted: true,
+    } satisfies ScreeningResult));
+
+  return finalResults;
 }
 
 const MAX_RETRIES = 3;
