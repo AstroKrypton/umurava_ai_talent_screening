@@ -23,6 +23,18 @@ _Updated to reflect official Umurava Talent Profile Schema_
 
 ---
 
+## TeamSpace — Development Team
+
+| **Name**                  | **Role**                     | **Core Responsibility**                                      |
+| ------------------------- | ---------------------------- | ----------------------------------------------------------- |
+| ITWITAYEHO GENTIL         | Team Lead & Full-Stack       | Architecture, Database (MongoDB), and System Integration.  |
+| NTAHOMVUKIYE JEAN CLOUDE  | AI & Data Engineer           | Gemini API optimization and "Escalade" logic.               |
+| UGIRASE ANITHA            | UI/UX Specialist             | Liquid Glass frontend and Responsive Design.                |
+| HODARI CONSTANTIN         | QA & Product Manager         | Data validation, testing, and project documentation.        |
+| AMANI GAD                 | Communications Lead          | Pitch deck, Demo video, and Business Strategy.              |
+
+---
+
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
