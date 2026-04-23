@@ -41,6 +41,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   screening.shortlistSize = jobPayload.shortlistSize;
   screening.results = [];
   screening.error = undefined;
+  screening.errorMessage = undefined;
   await screening.save();
 
   const execution = await executeScreening(jobPayload, applicantPayload);
@@ -52,6 +53,7 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
   screening.promptVersion = execution.promptVersion;
   screening.usedFallback = execution.usedFallback;
   screening.error = execution.usedFallback ? execution.error : undefined;
+  screening.errorMessage = execution.usedFallback ? execution.error : undefined;
   await screening.save();
 
   return NextResponse.json({

@@ -1,4 +1,5 @@
 import { performance } from "node:perf_hooks";
+import { Types } from "mongoose";
 import {
   getGeminiModelByName,
   getGeminiModelName,
@@ -27,8 +28,8 @@ export interface ScreeningExecutionResult {
 }
 
 function buildPrompt(job: JobForScreening, applicants: ApplicantForScreening[]) {
-  const candidatesPayload = applicants.map((applicant) => ({
-    applicantId: applicant._id,
+  const candidatesPayload = applicants.map((applicant, index) => ({
+    candidateIndex: index,
     firstName: applicant.firstName,
     lastName: applicant.lastName,
     headline: applicant.headline,
@@ -42,7 +43,19 @@ function buildPrompt(job: JobForScreening, applicants: ApplicantForScreening[]) 
 
   const jobSummary = `Title: ${job.title}\nRequired Skills: ${job.requiredSkills.join(", ")}\nMin Experience: ${job.minExperienceYears} years\nEmployment Type: ${job.employmentType}\nDescription: ${job.description}`;
 
-  return `You are an expert technical recruiter for the Umurava platform.\n\nEvaluate the following candidates for the job below.\n\nReturn ONLY valid JSON. No markdown. No explanation outside the JSON.\n\nJOB:\n${jobSummary}\n\nCANDIDATES (array of Umurava talent profiles):\n${JSON.stringify(candidatesPayload)}\n\nEach candidate has these fields:\nfirstName, lastName, headline,\nskills[]{name,level,yearsOfExperience},\nexperience[]{company,role,startDate,endDate,technologies,isCurrent},\neducation[]{institution,degree,fieldOfStudy},\nprojects[]{name,technologies,role}, availability{status,type}\n\n"Score each candidate on FOUR INDEPENDENT dimensions.\nEach dimension score is a RAW score from 0 to 100.\nDo NOT multiply by weights. Do NOT return weighted contributions.\nReturn the pure score for each dimension independently.\n\nskillsScore (0-100, RAW, do not weight):\n  - What percentage of required skills does this candidate have?\n  - Multiply by level: Expert=1.0, Advanced=0.85,\n    Intermediate=0.65, Beginner=0.4\n  - 100 = perfect match on all required skills at Expert level\n  - 0 = no required skills present\n\nexperienceScore (0-100, RAW, do not weight):\n  - Calculate total years from experience[].startDate to\n    experience[].endDate (today if isCurrent=true)\n  - If totalYears >= minExperienceYears: return 100\n  - If totalYears < minExperienceYears:\n    return Math.round((totalYears / minExperienceYears) * 100)\n  - If no experience: return 0\n\neducationScore (0-100, RAW, do not weight):\n  - PhD or Doctorate = 100\n  - Master's = 85\n  - Bachelor's = 70\n  - Diploma or Certificate = 50\n  - No education listed = 0\n\nrelevanceScore (0-100, RAW, do not weight):\n  - How well does the overall profile match the job description?\n  - Consider projects, headline, bio, and overall fit\n  - 100 = perfect overall match\n  - 0 = completely irrelevant profile\n\noverallScore (0-100):\n  - Calculate as weighted average:\n  - overallScore = Math.round(\n      (skillsScore * 0.40) +\n      (experienceScore * 0.30) +\n      (educationScore * 0.15) +\n      (relevanceScore * 0.15)\n    )\n\nIMPORTANT: skillsScore, experienceScore, educationScore, and\nrelevanceScore must each be between 0-100 independently.\noverallScore is the only weighted calculation.\nExample of CORRECT output:\n  skillsScore: 85\n  experienceScore: 100\n  educationScore: 70\n  relevanceScore: 60\n  overallScore: 84  (85*0.4 + 100*0.3 + 70*0.15 + 60*0.15)\n\nExample of WRONG output (what you must NOT return):\n  skillsScore: 19   ← this is a weighted contribution, not a score\n  experienceScore: 30\n  educationScore: 15"\n\nReturn JSON: { results: [ {\n  applicantId, overallScore, skillsScore, experienceScore,\n  educationScore, relevanceScore,\n  strengths (array of strings), gaps (array of strings),\n  recommendation (string, 50-150 words)\n} ] }\n\nSort by overallScore descending. Evaluate ALL candidates.`;
+  return `You are an expert technical recruiter for the Umurava platform.
+
+Evaluate the following candidates for the job below.
+
+Return ONLY valid JSON. No markdown. No explanation outside the JSON.
+Return candidateIndex exactly as provided (0, 1, 2, ...). Do not return applicantId. Do not generate any IDs.
+
+JOB:
+${jobSummary}
+
+CANDIDATES (array of Umurava talent profiles):
+${JSON.stringify(candidatesPayload)}
+\n\nEach candidate has these fields:\nfirstName, lastName, headline,\nskills[]{name,level,yearsOfExperience},\nexperience[]{company,role,startDate,endDate,technologies,isCurrent},\neducation[]{institution,degree,fieldOfStudy},\nprojects[]{name,technologies,role}, availability{status,type}\n\n"Score each candidate on FOUR INDEPENDENT dimensions.\nEach dimension score is a RAW score from 0 to 100.\nDo NOT multiply by weights. Do NOT return weighted contributions.\nReturn the pure score for each dimension independently.\n\nskillsScore (0-100, RAW, do not weight):\n  - What percentage of required skills does this candidate have?\n  - Multiply by level: Expert=1.0, Advanced=0.85,\n    Intermediate=0.65, Beginner=0.4\n  - 100 = perfect match on all required skills at Expert level\n  - 0 = no required skills present\n\nexperienceScore (0-100, RAW, do not weight):\n  - Calculate total years from experience[].startDate to\n    experience[].endDate (today if isCurrent=true)\n  - If totalYears >= minExperienceYears: return 100\n  - If totalYears < minExperienceYears:\n    return Math.round((totalYears / minExperienceYears) * 100)\n  - If no experience: return 0\n\neducationScore (0-100, RAW, do not weight):\n  - PhD or Doctorate = 100\n  - Master's = 85\n  - Bachelor's = 70\n  - Diploma or Certificate = 50\n  - No education listed = 0\n\nrelevanceScore (0-100, RAW, do not weight):\n  - How well does the overall profile match the job description?\n  - Consider projects, headline, bio, and overall fit\n  - 100 = perfect overall match\n  - 0 = completely irrelevant profile\n\noverallScore (0-100):\n  - Calculate as weighted average:\n  - overallScore = Math.round(\n      (skillsScore * 0.40) +\n      (experienceScore * 0.30) +\n      (educationScore * 0.15) +\n      (relevanceScore * 0.15)\n    )\n\nIMPORTANT: skillsScore, experienceScore, educationScore, and\nrelevanceScore must each be between 0-100 independently.\noverallScore is the only weighted calculation.\nExample of CORRECT output:\n  skillsScore: 85\n  experienceScore: 100\n  educationScore: 70\n  relevanceScore: 60\n  overallScore: 84  (85*0.4 + 100*0.3 + 70*0.15 + 60*0.15)\n\nExample of WRONG output (what you must NOT return):\n  skillsScore: 19   ← this is a weighted contribution, not a score\n  experienceScore: 30\n  educationScore: 15"\n\nReturn JSON: { results: [ {\n  candidateIndex, overallScore, skillsScore, experienceScore,\n  educationScore, relevanceScore,\n  strengths (array of strings), gaps (array of strings),\n  recommendation (string, 50-150 words)\n} ] }\n\nSort by overallScore descending. Evaluate ALL candidates.`;
 }
 
 function toScreeningResults(
@@ -51,19 +64,33 @@ function toScreeningResults(
   payload: GeminiResultPayload,
 ): ScreeningResult[] {
   const shortlistSize = job.shortlistSize || 10;
-  const applicantLookup = new Map(applicants.map((applicant) => [applicant._id, applicant]));
 
   const ranked = [...payload.results].sort((a, b) => b.overallScore - a.overallScore);
 
-  return ranked.map((item, index) => {
-    const applicant = applicantLookup.get(item.applicantId);
-    const applicantName = applicant ? `${applicant.firstName} ${applicant.lastName}`.trim() : item.applicantId;
-    const insights = applicant ? deriveApplicantInsights(job, applicant) : [];
+  const mapped: ScreeningResult[] = [];
 
-    return {
+  ranked.forEach((item, index) => {
+    const candidateIndex = Number(item.candidateIndex);
+    if (!Number.isInteger(candidateIndex) || candidateIndex < 0) {
+      console.error("Invalid candidateIndex received from Gemini:", item.candidateIndex);
+      return;
+    }
+
+    const applicant = applicants[candidateIndex];
+    if (!applicant) {
+      console.error("No applicant found for candidateIndex:", candidateIndex);
+      return;
+    }
+
+    const derivedInsights = deriveApplicantInsights(job, applicant);
+    const aiInsights = Array.isArray(item.insights) ? item.insights : [];
+    const mergedInsights = Array.from(new Set([...derivedInsights, ...aiInsights]));
+    const applicantName = `${applicant.firstName} ${applicant.lastName}`.trim();
+
+    mapped.push({
       rank: index + 1,
-      applicantId: item.applicantId,
-      applicantName: applicantName || item.applicantId,
+      applicantId: applicant._id,
+      applicantName: applicantName || applicant._id,
       overallScore: Math.round(item.overallScore),
       skillsScore: Math.round(item.skillsScore),
       experienceScore: Math.round(item.experienceScore),
@@ -72,10 +99,24 @@ function toScreeningResults(
       strengths: item.strengths.slice(0, 4),
       gaps: item.gaps.slice(0, 4),
       recommendation: item.recommendation.trim(),
-      isShortlisted: index < shortlistSize,
-      insights,
-    } satisfies ScreeningResult;
+      isShortlisted: item.isShortlisted ?? index < shortlistSize,
+      insights: mergedInsights,
+    });
   });
+
+  const validResults = mapped.filter((result) => {
+    if (!result.applicantId) return false;
+    try {
+      // Ensure value can be converted to a valid ObjectId; casting to string guards against ObjectId instances
+      void new Types.ObjectId(result.applicantId.toString());
+      return true;
+    } catch (error) {
+      console.error("Invalid applicantId skipped:", result, error);
+      return false;
+    }
+  });
+
+  return validResults;
 }
 
 const MAX_RETRIES = 3;

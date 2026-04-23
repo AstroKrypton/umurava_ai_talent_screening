@@ -56,6 +56,7 @@ export async function GET(
         createdAt: 1,
         aiModelVersion: 1,
         promptVersion: 1,
+        error: 1,
         errorMessage: 1,
       })
       .lean();
@@ -71,6 +72,7 @@ export async function GET(
         createdAt: screening.createdAt,
         aiModelVersion: screening.aiModelVersion,
         promptVersion: screening.promptVersion,
+        error: screening.error,
         errorMessage: screening.errorMessage,
       })),
     });

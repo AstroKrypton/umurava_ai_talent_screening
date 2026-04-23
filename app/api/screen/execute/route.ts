@@ -53,6 +53,7 @@ export async function POST(request: Request) {
     if (!jobDoc) {
       screening.status = "failed";
       screening.error = "Job not found.";
+      screening.errorMessage = "Job not found.";
       await screening.save();
       return NextResponse.json({ success: false, error: "Job not found." }, { status: 404 });
     }
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
     if (applicants.length === 0) {
       screening.status = "failed";
       screening.error = "Add applicants before running a screening.";
+      screening.errorMessage = "Add applicants before running a screening.";
       screening.results = [];
       screening.totalApplicants = 0;
       await screening.save();
@@ -84,6 +86,7 @@ export async function POST(request: Request) {
       screening.promptVersion = execution.promptVersion;
       screening.usedFallback = execution.usedFallback;
       screening.error = execution.usedFallback ? execution.error : undefined;
+      screening.errorMessage = execution.usedFallback ? execution.error : undefined;
       await screening.save();
 
       await JobModel.updateOne({ _id: screening.jobId }, { status: "screening" });
@@ -91,24 +94,40 @@ export async function POST(request: Request) {
       if (error instanceof ScreeningSystemLimitError) {
         screening.status = "failed";
         screening.error = error.message;
+        screening.errorMessage = error.message;
         screening.results = [];
         await screening.save();
         return NextResponse.json({ success: false, error: error.message }, { status: 429 });
       }
 
-      const message = error instanceof Error ? error.message : "Unknown screening error";
+      console.error("Screening failed:", error);
+      const rawMessage = error instanceof Error ? error.message : "Unknown screening error";
+      let userMessage = "Screening could not be completed. Please try again.";
+
+      if (rawMessage?.includes("BSONError") || rawMessage?.includes("ObjectId") || rawMessage?.includes("Cast to")) {
+        userMessage = "A data processing error occurred. Please try again.";
+      } else if (rawMessage?.toLowerCase().includes("timeout") || rawMessage?.includes("ETIMEDOUT")) {
+        userMessage = "The AI service took too long to respond. Please try again.";
+      } else if (rawMessage?.toLowerCase().includes("quota") || rawMessage?.includes("429") || rawMessage?.toLowerCase().includes("rate limit")) {
+        userMessage = "AI service is busy. Please wait a moment and try again.";
+      } else if (rawMessage?.includes("JSON") || rawMessage?.toLowerCase().includes("parse")) {
+        userMessage = "The AI returned an unexpected response. Please try again.";
+      }
+
       screening.status = "failed";
-      screening.error = message;
+      screening.error = userMessage;
+      screening.errorMessage = userMessage;
       screening.results = [];
       await screening.save();
 
-      return NextResponse.json({ success: false, error: message }, { status: 500 });
+      return NextResponse.json({ success: false, error: userMessage }, { status: 500 });
     }
   } catch (error) {
     console.error("Screening execution failed", error);
     if (screening.status === "processing") {
       screening.status = "failed";
       screening.error = "Screening execution failed unexpectedly.";
+      screening.errorMessage = "Screening could not be completed. Please try again.";
       screening.results = [];
       await screening.save();
     }

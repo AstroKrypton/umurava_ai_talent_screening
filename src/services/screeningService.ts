@@ -16,11 +16,25 @@ const scoreSchema = z.preprocess(
     .max(100, "Scores cannot exceed 100"),
 );
 
+const candidateIndexSchema = z.preprocess(
+  (value) => {
+    if (typeof value === "string") {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isFinite(parsed) ? parsed : value;
+    }
+    return value;
+  },
+  z
+    .number()
+    .int("candidateIndex must be an integer")
+    .min(0, "candidateIndex must be zero or greater"),
+);
+
 export const geminiResultSchema = z.object({
   results: z
     .array(
       z.object({
-        applicantId: z.string().min(1, "applicantId is required"),
+        candidateIndex: candidateIndexSchema,
         overallScore: scoreSchema,
         skillsScore: scoreSchema,
         experienceScore: scoreSchema,
@@ -29,6 +43,8 @@ export const geminiResultSchema = z.object({
         strengths: z.array(z.string()).default([]),
         gaps: z.array(z.string()).default([]),
         recommendation: z.string().min(20),
+        isShortlisted: z.boolean().optional(),
+        insights: z.array(z.string()).optional(),
       }),
     )
     .min(1, "At least one result required"),

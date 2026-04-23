@@ -32,6 +32,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       promptVersion: screening.promptVersion,
       usedFallback: screening.usedFallback ?? false,
       error: screening.error,
+      errorMessage: screening.errorMessage,
       results: screening.results,
       createdAt: screening.createdAt,
       updatedAt: screening.updatedAt,

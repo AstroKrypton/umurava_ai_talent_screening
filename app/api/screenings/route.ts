@@ -65,6 +65,7 @@ export async function POST(request: Request) {
     screening.promptVersion = execution.promptVersion;
     screening.processingTimeMs = execution.processingTimeMs;
     screening.error = execution.usedFallback ? execution.error : undefined;
+    screening.errorMessage = execution.usedFallback ? execution.error : undefined;
     await screening.save();
 
     await JobModel.updateOne({ _id: jobId }, { status: "screening" });
@@ -93,18 +94,33 @@ export async function POST(request: Request) {
     if (error instanceof ScreeningSystemLimitError) {
       screening.status = "failed";
       screening.error = error.message;
+      screening.errorMessage = error.message;
       await screening.save();
 
       revalidateJobsListing();
       return NextResponse.json(error.body, { status: error.status });
     }
 
-    const message = error instanceof Error ? error.message : "Unknown screening error";
+    console.error("Screening failed:", error);
+    const rawMessage = error instanceof Error ? error.message : "Unknown screening error";
+    let userMessage = "Screening could not be completed. Please try again.";
+
+    if (rawMessage?.includes("BSONError") || rawMessage?.includes("ObjectId") || rawMessage?.includes("Cast to")) {
+      userMessage = "A data processing error occurred. Please try again.";
+    } else if (rawMessage?.toLowerCase().includes("timeout") || rawMessage?.includes("ETIMEDOUT")) {
+      userMessage = "The AI service took too long to respond. Please try again.";
+    } else if (rawMessage?.toLowerCase().includes("quota") || rawMessage?.includes("429") || rawMessage?.toLowerCase().includes("rate limit")) {
+      userMessage = "AI service is busy. Please wait a moment and try again.";
+    } else if (rawMessage?.includes("JSON") || rawMessage?.toLowerCase().includes("parse")) {
+      userMessage = "The AI returned an unexpected response. Please try again.";
+    }
+
     screening.status = "failed";
-    screening.error = message;
+    screening.error = userMessage;
+    screening.errorMessage = userMessage;
     await screening.save();
 
     revalidateJobsListing();
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return NextResponse.json({ success: false, error: userMessage }, { status: 500 });
   }
 }

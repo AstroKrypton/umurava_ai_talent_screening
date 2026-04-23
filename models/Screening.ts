@@ -51,6 +51,7 @@ const screeningSchema = new Schema(
     processingTimeMs: { type: Number },
     usedFallback: { type: Boolean, default: false },
     error: { type: String, trim: true },
+    errorMessage: { type: String, trim: true },
   },
   {
     timestamps: true,

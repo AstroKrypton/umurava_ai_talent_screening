@@ -49,6 +49,7 @@ type ScreeningRecord = {
   promptVersion?: string;
   usedFallback?: boolean;
   error?: string;
+  errorMessage?: string;
 };
 
 type ScreeningResultDetail = {
@@ -79,7 +80,22 @@ type ScreeningDetailRecord = {
   promptVersion?: string;
   usedFallback?: boolean;
   error?: string;
+  errorMessage?: string;
   createdAt: string;
+};
+
+type ScreeningSummaryApiPayload = {
+  id: string;
+  status: ScreeningRecord["status"];
+  totalApplicants: number;
+  shortlistSize: 10 | 20;
+  processingTimeMs?: number;
+  aiModelVersion?: string;
+  promptVersion?: string;
+  createdAt: string;
+  usedFallback?: boolean;
+  error?: string | null;
+  errorMessage?: string | null;
 };
 
 type ScreeningApiPayload = {
@@ -94,6 +110,7 @@ type ScreeningApiPayload = {
   promptVersion?: string;
   usedFallback?: boolean;
   error?: string;
+  errorMessage?: string;
   createdAt: string;
   updatedAt?: string;
 };
@@ -518,6 +535,7 @@ export default function JobsWorkspace({
   const mapApiPayloadToDetail = useCallback(
     (payload: ScreeningApiPayload, fallbackJobId?: string): ScreeningDetailRecord => {
       const jobIdentifier = payload.jobId ?? fallbackJobId ?? "";
+      const userFacingError = payload.errorMessage ?? payload.error;
 
       return {
         id: payload.id,
@@ -530,7 +548,8 @@ export default function JobsWorkspace({
         aiModelVersion: payload.aiModelVersion,
         promptVersion: payload.promptVersion,
         usedFallback: payload.usedFallback,
-        error: payload.error,
+        error: userFacingError ?? undefined,
+        errorMessage: userFacingError ?? undefined,
         createdAt: payload.createdAt,
       };
     },
@@ -555,7 +574,8 @@ export default function JobsWorkspace({
       aiModelVersion: detail.aiModelVersion,
       promptVersion: detail.promptVersion,
       usedFallback: detail.usedFallback,
-      error: detail.error,
+      error: detail.error ?? detail.errorMessage,
+      errorMessage: detail.errorMessage ?? detail.error,
     };
 
     setScreenings((current) => {
@@ -573,6 +593,53 @@ export default function JobsWorkspace({
     }));
   }, []);
 
+  const handleRetryScreening = useCallback(
+    async (screeningId: string, jobId: string) => {
+      try {
+        const response = await fetch(`/api/screenings/${screeningId}/retry`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        const payload = (await response.json().catch(() => null)) as
+          | { success?: boolean; data?: ScreeningApiPayload; error?: string }
+          | null;
+
+        if (!response.ok || !payload?.success || !payload.data) {
+          const message = payload?.error || "Unable to retry screening.";
+          showToast({
+            title: "Retry failed",
+            description: message,
+            variant: "error",
+          });
+          return;
+        }
+
+        const detail = mapApiPayloadToDetail(payload.data, jobId);
+        commitScreeningDetail(detail);
+        setSelectedScreening(detail.id);
+        setSelectedResult(null);
+
+        showToast({
+          title: "Retry started",
+          description: "We’ll refresh this shortlist once the AI finishes.",
+          variant: "info",
+        });
+
+        void refreshScreenings(jobId);
+      } catch (error) {
+        console.error("Retry failed:", error);
+        const message = error instanceof Error ? error.message : "Unable to retry screening.";
+        showToast({
+          title: "Retry failed",
+          description: message,
+          variant: "error",
+        });
+      }
+    },
+    [commitScreeningDetail, mapApiPayloadToDetail, refreshScreenings, showToast],
+  );
+
   const pollScreeningStatus = useCallback(
     async function poll(session: StoredScreeningSession, attempt = 0): Promise<void> {
       if (attempt >= SCREENING_MAX_POLL_RETRIES) {
@@ -589,7 +656,12 @@ export default function JobsWorkspace({
           const jobScreenings = current[session.jobId] ?? [];
           const updated: ScreeningRecord[] = jobScreenings.map((entry) =>
             entry.id === session.screeningId
-              ? ({ ...entry, status: "failed" as const, error: timeoutMessage } as ScreeningRecord)
+              ? ({
+                  ...entry,
+                  status: "failed" as const,
+                  error: timeoutMessage,
+                  errorMessage: timeoutMessage,
+                } satisfies ScreeningRecord)
               : entry,
           );
           return { ...current, [session.jobId]: updated };
@@ -604,7 +676,8 @@ export default function JobsWorkspace({
               ...existing,
               status: "failed" as const,
               error: timeoutMessage,
-            } as ScreeningDetailRecord,
+              errorMessage: timeoutMessage,
+            } satisfies ScreeningDetailRecord,
           };
         });
 
@@ -882,12 +955,27 @@ export default function JobsWorkspace({
       const response = await fetch(`/api/jobs/${jobId}/screenings`);
       const payload = (await response.json()) as {
         success: boolean;
-        data?: ScreeningRecord[];
+        data?: ScreeningSummaryApiPayload[];
         error?: string;
       };
 
       if (response.ok && payload.success && payload.data) {
-        const nextRecords = payload.data ?? [];
+        const nextRecords: ScreeningRecord[] = payload.data.map((record) => {
+          const userError = record.errorMessage ?? record.error ?? undefined;
+          return {
+            id: record.id,
+            status: record.status,
+            createdAt: record.createdAt,
+            totalApplicants: record.totalApplicants,
+            shortlistSize: record.shortlistSize,
+            processingTimeMs: record.processingTimeMs,
+            aiModelVersion: record.aiModelVersion,
+            promptVersion: record.promptVersion,
+            usedFallback: record.usedFallback ?? undefined,
+            error: userError,
+            errorMessage: userError,
+          } satisfies ScreeningRecord;
+        });
         setScreenings((current) => ({
           ...current,
           [jobId]: nextRecords,
@@ -2621,19 +2709,30 @@ export default function JobsWorkspace({
                                     ? "Unknown timestamp"
                                     : screeningDateFormatter.format(createdDate);
                                   const processingLabel = formatProcessingDuration(record.processingTimeMs);
+                                  const userFacingError =
+                                    record.errorMessage ?? record.error ?? "An unexpected error occurred. Please try again.";
+
+                                  const handleCardSelect = () => {
+                                    void loadScreeningDetail(record.id, activeJob.id);
+                                  };
 
                                   return (
-                                    <button
+                                    <div
                                       key={record.id}
-                                      className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
+                                      role="button"
+                                      tabIndex={0}
+                                      className={`w-full rounded-2xl border px-4 py-4 text-left transition focus:outline-none focus:ring-2 focus:ring-[#0F8A5F]/40 focus:ring-offset-2 focus:ring-offset-white ${
                                         isActive
                                           ? "border-[#0F8A5F]/50 bg-[#0F8A5F]/10 shadow-[0_12px_40px_rgba(15,138,95,0.18)]"
                                           : "border-white/80 bg-white/80 hover:border-[#0F8A5F]/40 hover:shadow-sm"
                                       }`}
-                                      onClick={() => {
-                                        void loadScreeningDetail(record.id, activeJob.id);
+                                      onClick={handleCardSelect}
+                                      onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                          event.preventDefault();
+                                          handleCardSelect();
+                                        }
                                       }}
-                                      type="button"
                                     >
                                       <div className="flex flex-wrap items-center justify-between gap-3">
                                         <div>
@@ -2653,10 +2752,38 @@ export default function JobsWorkspace({
                                         {processingLabel ? <span>Processing {processingLabel}</span> : null}
                                         {record.aiModelVersion ? <span>Model {record.aiModelVersion}</span> : null}
                                       </div>
-                                      {record.error ? (
-                                        <div className="mt-2 text-xs text-[#B91C1C]">Error: {record.error}</div>
+                                      {record.status === "failed" ? (
+                                        <div className="mt-3 rounded-xl border-l-4 border-[#C8401E] bg-[#FAF0ED] p-3">
+                                          <p className="mb-1 text-xs font-semibold text-[#C8401E]">Screening failed</p>
+                                          <p className="mb-2 text-xs text-slate-600">{userFacingError}</p>
+                                          <button
+                                            className="flex items-center gap-1 text-xs font-semibold text-[#0B4F8A] hover:underline"
+                                            onClick={(event) => {
+                                              event.stopPropagation();
+                                              void handleRetryScreening(record.id, activeJob.id);
+                                            }}
+                                            type="button"
+                                          >
+                                            <svg
+                                              width="12"
+                                              height="12"
+                                              fill="none"
+                                              stroke="currentColor"
+                                              strokeWidth="2"
+                                              viewBox="0 0 24 24"
+                                              aria-hidden="true"
+                                            >
+                                              <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.658l3.181 3.182m0-4.991v4.99"
+                                              />
+                                            </svg>
+                                            Try again
+                                          </button>
+                                        </div>
                                       ) : null}
-                                    </button>
+                                    </div>
                                   );
                                 })}
                               {screeningsVisibleCount[activeJob.id] &&
